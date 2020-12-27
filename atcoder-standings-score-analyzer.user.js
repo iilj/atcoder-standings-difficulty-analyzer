@@ -91,6 +91,9 @@
     table-layout: fixed;
     margin-bottom: 1.5rem;
 }
+#acssa-thead {
+    font-weight: bold;
+}
 .acssa-loader-wrapper {
     background-color: #337ab7;
     display: flex;
@@ -137,6 +140,20 @@
             this.memo = new Map();
         }
 
+        perf2ExpectedAcceptedCount = (m) => {
+            let expectedAcceptedCount;
+            if (this.prepared.has(m)) {
+                expectedAcceptedCount = this.prepared.get(m);
+            } else {
+                expectedAcceptedCount = this.innerRatings.reduce((prev_expected_accepts, innerRating) =>
+                    prev_expected_accepts += 1 / (1 + Math.pow(6, (m - innerRating) / 400)), 0);
+                this.prepared.set(m, expectedAcceptedCount);
+            }
+            return expectedAcceptedCount;
+        };
+
+        perf2Ranking = (x) => this.perf2ExpectedAcceptedCount(x) + 0.5;
+
         /** Difficulty 推定値を算出する
          *  @type {((acceptedCount: number) => number)} */
         binarySearch = (acceptedCount) => {
@@ -147,14 +164,8 @@
             let ub = 10000;
             while (ub - lb > 1) {
                 const m = Math.floor((ub + lb) / 2);
-                let expectedAcceptedCount;
-                if (this.prepared.has(m)) {
-                    expectedAcceptedCount = this.prepared.get(m);
-                } else {
-                    expectedAcceptedCount = this.innerRatings.reduce((prev_expected_accepts, innerRating) =>
-                        prev_expected_accepts += 1 / (1 + Math.pow(6, (m - innerRating) / 400)), 0);
-                    this.prepared.set(m, expectedAcceptedCount);
-                }
+                const expectedAcceptedCount = this.perf2ExpectedAcceptedCount(m);
+
                 if (expectedAcceptedCount < acceptedCount) ub = m;
                 else lb = m;
             }
@@ -267,8 +278,8 @@
         const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
         // console.log(tasks, standings);
 
-        // /** @type {Map<number, number>} */
-        // const scoreCountMap = new Map();
+        /** @type {Map<number, number[]>} */
+        const scoreLastAcceptedTimeMap = new Map();
 
         // コンテスト中かどうか判別する
         let isDuringContest = true;
@@ -294,6 +305,8 @@
          * @type {number[]} */
         const innerRatings = [];
 
+        const NS2SEC = 1000000000;
+
         // 順位表情報を走査する（内部レートのリストと正答時間リストを構築する）
         for (let i = 0; i < standingsData.length; ++i) {
             const standingsEntry = standingsData[i];
@@ -317,11 +330,12 @@
             if (score === 0 && penalty === 0) continue; // NoSub を飛ばす
             // console.log(i + 1, score, penalty);
 
-            // if (scoreCountMap.has(score)) {
-            //     scoreCountMap.set(score, scoreCountMap.get(score) + 1);
-            // } else {
-            //     scoreCountMap.set(score, 1);
-            // }
+            score /= 100;
+            if (scoreLastAcceptedTimeMap.has(score)) {
+                scoreLastAcceptedTimeMap.get(score).push(standingsEntry.TotalResult.Elapsed / NS2SEC)
+            } else {
+                scoreLastAcceptedTimeMap.set(score, [standingsEntry.TotalResult.Elapsed / NS2SEC]);
+            }
 
             const innerRating = RatingConverter.toInnerRating(
                 Math.max(RatingConverter.toRealRating(correctedRating), 1), standingsEntry.Competitions);
@@ -335,7 +349,7 @@
                 const isAccepted = (taskResultEntry?.Score > 0);
                 if (isAccepted) {
                     ++taskAcceptedCounts[j];
-                    taskAcceptedElapsedTimes[j].push(taskResultEntry.Elapsed / 1000000000);
+                    taskAcceptedElapsedTimes[j].push(taskResultEntry.Elapsed / NS2SEC);
                 }
             }
         }
@@ -343,7 +357,8 @@
 
         const dc = new DifficultyCalculator(innerRatings);
 
-        const plotlyDivId = 'acssa-myDiv';
+        const plotlyDifficultyChartId = 'acssa-myDiv';
+        const plotlyLastAcceptedTimeChartId = 'acssa-myDiv2';
         $('#vue-standings').prepend(`
         <div id="acssa-contents">
           <table id="acssa-table" class="table table-bordered table-hover th-center td-center td-middle">
@@ -361,7 +376,8 @@
                 <div></div>
             </div>
           </div>
-          <div id="${plotlyDivId}" style="width:100%;"><!-- Plotly chart will be drawn inside this DIV --></div>
+          <div id="${plotlyDifficultyChartId}" style="width:100%;"></div>
+          <div id="${plotlyLastAcceptedTimeChartId}" style="width:100%;"></div>
         </div>
         `);
 
@@ -396,7 +412,7 @@
 
             // 時系列データの準備
             /** @type {{x: number, y: number, type: string, name: string}[]} */
-            const data = [];
+            const difficultyChartData = [];
             for (let j = 0; j < tasks.length; ++j) { // 
                 const interval = Math.ceil(taskAcceptedCounts[j] / 160);
                 /** @type {number[]} */
@@ -405,16 +421,49 @@
                     return ar;
                 }, []);
 
-                data.push({
+                difficultyChartData.push({
                     x: taskAcceptedElapsedTimesForChart,
                     y: taskAcceptedElapsedTimesForChart.map((_, i) => dc.binarySearch(interval * i + 1)),
                     type: 'scatter',
                     name: `${tasks[j].Assignment}`,
                 });
             }
-            const duration = getContestDurationSec();
 
-            // X 軸フォーマットをカスタムする
+            // 得点と提出時間データの準備
+            /** @type {{x: number, y: number, type: string, name: string}[]} */
+            const lastAcceptedTimeChartData = [];
+            const scores = [...scoreLastAcceptedTimeMap.keys()];
+            scores.sort((a, b) => b - a);
+            let acc = 0;
+            let maxAcceptedTime = 0;
+            scores.forEach(score => {
+                const lastAcceptedTimes = scoreLastAcceptedTimeMap.get(score);
+                lastAcceptedTimes.sort((a, b) => a - b);
+                const interval = Math.ceil(lastAcceptedTimes.length / 100);
+                /** @type {number[]} */
+                const lastAcceptedTimesForChart = lastAcceptedTimes.reduce((ar, tm, idx) => {
+                    if (idx % interval == 0 || idx == lastAcceptedTimes.length - 1) ar.push(tm);
+                    return ar;
+                }, []);
+                const lastAcceptedTimesRanks = lastAcceptedTimes.reduce((ar, tm, idx) => {
+                    if (idx % interval == 0 || idx == lastAcceptedTimes.length - 1) ar.push(acc + idx + 1);
+                    return ar;
+                }, []);
+
+                lastAcceptedTimeChartData.push({
+                    x: lastAcceptedTimesRanks,
+                    y: lastAcceptedTimesForChart,
+                    type: 'scatter',
+                    name: `${score}`,
+                });
+
+                acc += lastAcceptedTimes.length;
+                if (lastAcceptedTimes[lastAcceptedTimes.length - 1] > maxAcceptedTime) {
+                    maxAcceptedTime = lastAcceptedTimes[lastAcceptedTimes.length - 1];
+                }
+            });
+
+            // 軸フォーマットをカスタムする
             // Support specifying a function for tickformat · Issue #1464 · plotly/plotly.js
             // https://github.com/plotly/plotly.js/issues/1464#issuecomment-498050894
             {
@@ -434,6 +483,7 @@
 
             // 背景用設定
             const alpha = 0.3;
+            /** @type {[number, number, string][]} */
             const colors = [
                 [0, 400, `rgba(128,128,128,${alpha})`],
                 [400, 800, `rgba(128,0,0,${alpha})`],
@@ -445,49 +495,113 @@
                 [2800, 10000, `rgba(255,0,0,${alpha})`],
             ];
 
-            // 描画
-            const layout = {
-                title: 'Difficulty',
-                xaxis: {
-                    dtick: 60 * 10,
-                    tickformat: 'TIME',
-                    range: [0, duration],
-                    // title: { text: 'Elapsed' }
-                },
-                yaxis: {
-                    dtick: 400,
-                    tickformat: 'd',
-                    range: [
-                        Math.max(0, Math.floor((yMin - 100) / 400) * 400),
-                        Math.max(0, Math.ceil((yMax + 100) / 400) * 400)
-                    ],
-                    // title: { text: 'Difficulty' }
-                },
-                shapes: colors.map(c => {
-                    return {
-                        type: 'rect',
-                        layer: 'below',
-                        xref: 'x',
-                        yref: 'y',
-                        x0: 0,
-                        x1: duration,
-                        y0: c[0],
-                        y1: c[1],
-                        line: { width: 0 },
-                        fillcolor: c[2]
-                    };
-                }),
-                margin: {
-                    b: 60,
-                    t: 30,
-                }
-            };
-            const config = { autosize: true };
-            Plotly.newPlot(plotlyDivId, data, layout, config);
+            // Difficulty Chart 描画
+            {
+                // 描画
+                const duration = getContestDurationSec();
+                const layout = {
+                    title: 'Difficulty',
+                    xaxis: {
+                        dtick: 60 * 10,
+                        tickformat: 'TIME',
+                        range: [0, duration],
+                        // title: { text: 'Elapsed' }
+                    },
+                    yaxis: {
+                        dtick: 400,
+                        tickformat: 'd',
+                        range: [
+                            Math.max(0, Math.floor((yMin - 100) / 400) * 400),
+                            Math.max(0, Math.ceil((yMax + 100) / 400) * 400)
+                        ],
+                        // title: { text: 'Difficulty' }
+                    },
+                    shapes: colors.map(c => {
+                        return {
+                            type: 'rect',
+                            layer: 'below',
+                            xref: 'x',
+                            yref: 'y',
+                            x0: 0,
+                            x1: duration,
+                            y0: c[0],
+                            y1: c[1],
+                            line: { width: 0 },
+                            fillcolor: c[2]
+                        };
+                    }),
+                    margin: {
+                        b: 60,
+                        t: 30,
+                    }
+                };
+                const config = { autosize: true };
+                Plotly.newPlot(plotlyDifficultyChartId, difficultyChartData, layout, config);
 
-            window.addEventListener('resize', () => {
-                Plotly.relayout(plotlyDivId, { width: document.getElementById(plotlyDivId).clientWidth });
-            });
+                window.addEventListener('resize', () => {
+                    Plotly.relayout(plotlyDifficultyChartId, { width: document.getElementById(plotlyDifficultyChartId).clientWidth });
+                });
+            }
+
+            // LastAcceptedTime Chart 描画
+            {
+                const xMax = Math.ceil(acc / 10) * 10;
+                const yMax = Math.ceil(maxAcceptedTime / 10) * 10;
+                /** @type {[number, number, string][]} */
+                const rectSpans = colors.reduce((ar, cur) => {
+                    const right = (cur[0] == 0) ? xMax : dc.perf2Ranking(cur[0]);
+                    if (right < 1) return ar;
+                    const left = dc.perf2Ranking(cur[1]);
+                    if (left > acc) return ar;
+                    ar.push([Math.max(0, left), Math.min(xMax, right), cur[2]]);
+                    return ar;
+                }, []);
+                // console.log(colors);
+                // console.log(rectSpans);
+                const layout = {
+                    title: 'LastAcceptedTime v.s. Rank',
+                    xaxis: {
+                        // dtick: 100,
+                        tickformat: 'd',
+                        range: [0, xMax],
+                        // title: { text: 'Elapsed' }
+                    },
+                    yaxis: {
+                        dtick: 60 * 10,
+                        tickformat: 'TIME',
+                        range: [0, yMax],
+                        // range: [
+                        //     Math.max(0, Math.floor((yMin - 100) / 400) * 400),
+                        //     Math.max(0, Math.ceil((yMax + 100) / 400) * 400)
+                        // ],
+                        // title: { text: 'Difficulty' }
+                    },
+                    shapes: rectSpans.map(span => {
+                        return {
+                            type: 'rect',
+                            layer: 'below',
+                            xref: 'x',
+                            yref: 'y',
+                            x0: span[0],
+                            x1: span[1],
+                            y0: 0,
+                            y1: yMax,
+                            line: { width: 0 },
+                            fillcolor: span[2]
+                        };
+                    }),
+                    margin: {
+                        b: 60,
+                        t: 30,
+                    }
+                };
+                const config = { autosize: true };
+                Plotly.newPlot(plotlyLastAcceptedTimeChartId, lastAcceptedTimeChartData, layout, config);
+
+                window.addEventListener('resize', () => {
+                    Plotly.relayout(plotlyLastAcceptedTimeChartId, { width: document.getElementById(plotlyLastAcceptedTimeChartId).clientWidth });
+                });
+            }
 
             document.getElementById('acssa-loader').style.display = 'none';
         }, 100);
