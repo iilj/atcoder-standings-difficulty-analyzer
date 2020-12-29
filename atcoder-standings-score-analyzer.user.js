@@ -78,7 +78,7 @@
  * @property {TaskInfoEntry[]} TaskInfo 問題データ
  */
 
-/* globals vueStandings, $, Plotly */
+/* globals vueStandings, $, contestScreenName, startTime, endTime, userScreenName, Plotly */
 
 (() => {
     'use strict';
@@ -236,37 +236,14 @@
         return `${sign}${Math.floor(sec / 60)}:${`0${sec % 60}`.slice(-2)}`;
     };
 
-    /** timeanddate.com の URL から日時を抽出する
-     * @type {(href: string) => Date}
-     */
-    const extractTime = (href) => {
-        // http://www.timeanddate.com/worldclock/fixedtime.html?iso=20201226T2100&p1=248
-        const dateMatchArray = href.match(/iso=(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)/);
-        if (dateMatchArray) {
-            return new Date(
-                Number(dateMatchArray[1]),
-                Number(dateMatchArray[2]) - 1,
-                Number(dateMatchArray[3]),
-                Number(dateMatchArray[4]),
-                Number(dateMatchArray[5]),
-            );
-        }
-        return null;
-    };
-
     /** 現在のページから，コンテストの開始から終了までの秒数を抽出する
      * @type {() => number}
      */
-    const getContestDurationSec = () => {
-        const first = document.querySelector('.contest-duration a:first-child').href;
-        const last = document.querySelector('.contest-duration a:last-child').href;
-        const ms = extractTime(last) - extractTime(first);
-        return ms / 1000;
-    };
+    const getContestDurationSec = () => (endTime - startTime) / 1000;
 
     /** 順位表更新時の処理：テーブル追加
      *  @type {(v: Standings) => void} */
-    const onStandingsChanged = (standings) => {
+    const onStandingsChanged = async (standings) => {
         if (!standings) return;
 
         { // remove old contents
@@ -307,6 +284,9 @@
 
         const NS2SEC = 1000000000;
 
+        /** @type {{[key: string]: number}} */
+        const innerRatingsFromPredictor = await (await fetch(`https://data.ac-predictor.com/aperfs/${contestScreenName}.json`)).json();
+
         // 順位表情報を走査する（内部レートのリストと正答時間リストを構築する）
         for (let i = 0; i < standingsData.length; ++i) {
             const standingsEntry = standingsData[i];
@@ -337,8 +317,10 @@
                 scoreLastAcceptedTimeMap.set(score, [standingsEntry.TotalResult.Elapsed / NS2SEC]);
             }
 
-            const innerRating = RatingConverter.toInnerRating(
-                Math.max(RatingConverter.toRealRating(correctedRating), 1), standingsEntry.Competitions);
+            const innerRating = (standingsEntry.UserScreenName in innerRatingsFromPredictor)
+                ? innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                : RatingConverter.toInnerRating(
+                    Math.max(RatingConverter.toRealRating(correctedRating), 1), standingsEntry.Competitions);
             if (innerRating) innerRatings.push(innerRating);
             else {
                 console.log(i, innerRating, rating, standingsEntry.Competitions);
@@ -546,13 +528,13 @@
             // LastAcceptedTime Chart 描画
             {
                 const xMax = Math.ceil(acc / 10) * 10;
-                const yMax = Math.ceil(maxAcceptedTime / 10) * 10;
+                const yMax = Math.ceil((maxAcceptedTime + 60 * 5) / (60 * 10)) * (60 * 10);
                 /** @type {[number, number, string][]} */
                 const rectSpans = colors.reduce((ar, cur) => {
                     const right = (cur[0] == 0) ? xMax : dc.perf2Ranking(cur[0]);
                     if (right < 1) return ar;
                     const left = dc.perf2Ranking(cur[1]);
-                    if (left > acc) return ar;
+                    if (left > xMax) return ar;
                     ar.push([Math.max(0, left), Math.min(xMax, right), cur[2]]);
                     return ar;
                 }, []);
