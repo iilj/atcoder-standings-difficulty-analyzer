@@ -103,6 +103,21 @@
     margin-bottom: 1.5rem;
     border-radius: 3px;
 }
+#acssa-chart-tab {
+    margin-bottom: 0.5rem;
+}
+#acssa-chart-tab a {
+    cursor: pointer;
+}
+#acssa-chart-tab span.glyphicon {
+    margin-right: 0.5rem;
+}
+.acssa-chart-wrapper {
+    display: none;
+}
+.acssa-chart-wrapper.acssa-chart-wrapper-active {
+    display: block;
+}
     `;
     GM_addStyle(loaderStyles + loaderWrapperStyles);
 
@@ -288,6 +303,7 @@
         const innerRatingsFromPredictor = await (await fetch(`https://data.ac-predictor.com/aperfs/${contestScreenName}.json`)).json();
 
         // 順位表情報を走査する（内部レートのリストと正答時間リストを構築する）
+        let participants = 0;
         for (let i = 0; i < standingsData.length; ++i) {
             const standingsEntry = standingsData[i];
 
@@ -295,6 +311,7 @@
             if (standingsEntry.UserIsDeleted) continue; // アカウント削除
             const correctedRating = isDuringContest ? standingsEntry.Rating : standingsEntry.OldRating;
             if (correctedRating === 0) continue; // 初参加
+            participants++;
 
             // これは飛ばしちゃダメ（提出しても 0 AC だと Penalty == 0 なので）
             // if (standingsEntry.TotalResult.Score == 0 && standingsEntry.TotalResult.Penalty == 0) continue;
@@ -339,8 +356,9 @@
 
         const dc = new DifficultyCalculator(innerRatings);
 
-        const plotlyDifficultyChartId = 'acssa-myDiv';
-        const plotlyLastAcceptedTimeChartId = 'acssa-myDiv2';
+        const plotlyDifficultyChartId = 'acssa-mydiv-difficulty';
+        const plotlyLastAcceptedCountChartId = 'acssa-mydiv-accepted-count';
+        const plotlyLastAcceptedTimeChartId = 'acssa-mydiv-accepted-time';
         $('#vue-standings').prepend(`
         <div id="acssa-contents">
           <table id="acssa-table" class="table table-bordered table-hover th-center td-center td-middle">
@@ -351,6 +369,14 @@
               <tr id="acssa-tbody"></tr>
             </tbody>
           </table>
+          <ul class="nav nav-pills small" id="acssa-chart-tab">
+            <li class="active">
+              <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>Difficulty</a></li>
+            <li>
+              <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>AC Count</a></li>
+            <li>
+              <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>LastAcceptedTime</a></li>
+		  </ul>
           <div id="acssa-loader" class="loader acssa-loader-wrapper">
             <div class="loader-inner ball-pulse">
                 <div></div>
@@ -358,10 +384,47 @@
                 <div></div>
             </div>
           </div>
-          <div id="${plotlyDifficultyChartId}" style="width:100%;"></div>
-          <div id="${plotlyLastAcceptedTimeChartId}" style="width:100%;"></div>
+          <div id="acssa-chart-block">
+            <div class="acssa-chart-wrapper acssa-chart-wrapper-active" id="${plotlyDifficultyChartId}-wrapper">
+                <div id="${plotlyDifficultyChartId}" style="width:100%;"></div>
+            </div>
+            <div class="acssa-chart-wrapper" id="${plotlyLastAcceptedCountChartId}-wrapper">
+                <div id="${plotlyLastAcceptedCountChartId}" style="width:100%;"></div>
+            </div>
+            <div class="acssa-chart-wrapper" id="${plotlyLastAcceptedTimeChartId}-wrapper">
+                <div id="${plotlyLastAcceptedTimeChartId}" style="width:100%;"></div>
+            </div>
+          </div>
         </div>
         `);
+
+        let activeTab = 0;
+        document.querySelectorAll(".acssa-chart-tab-button").forEach((btn, key) => {
+            btn.addEventListener("click", () => {
+                // check whether active or not
+                if (btn.parentElement.className == "active") return;
+                // modify visibility
+                activeTab = key;
+                document.querySelector("#acssa-chart-tab li.active").classList.remove("active");
+                document.querySelector(`#acssa-chart-tab li:nth-child(${key + 1})`).classList.add("active");
+                document.querySelector("#acssa-chart-block div.acssa-chart-wrapper-active").classList.remove("acssa-chart-wrapper-active");
+                document.querySelector(`#acssa-chart-block div.acssa-chart-wrapper:nth-child(${key + 1})`).classList.add("acssa-chart-wrapper-active");
+                // resize charts
+                switch (key) {
+                    case 0:
+                        Plotly.relayout(plotlyDifficultyChartId, { width: document.getElementById(plotlyDifficultyChartId).clientWidth });
+                        break;
+                    case 1:
+                        Plotly.relayout(plotlyLastAcceptedCountChartId, { width: document.getElementById(plotlyLastAcceptedCountChartId).clientWidth });
+                        break;
+                    case 2:
+                        Plotly.relayout(plotlyLastAcceptedTimeChartId, { width: document.getElementById(plotlyLastAcceptedTimeChartId).clientWidth });
+                        break;
+                    default:
+                        break;
+                }
+            });
+        });
 
         // 現在の Difficulty テーブルを構築する
         for (let j = 0; j < tasks.length; ++j) {
@@ -395,6 +458,7 @@
             // 時系列データの準備
             /** @type {{x: number, y: number, type: string, name: string}[]} */
             const difficultyChartData = [];
+            const acceptedCountChartData = [];
             for (let j = 0; j < tasks.length; ++j) { // 
                 const interval = Math.ceil(taskAcceptedCounts[j] / 160);
                 /** @type {number[]} */
@@ -406,6 +470,12 @@
                 difficultyChartData.push({
                     x: taskAcceptedElapsedTimesForChart,
                     y: taskAcceptedElapsedTimesForChart.map((_, i) => dc.binarySearch(interval * i + 1)),
+                    type: 'scatter',
+                    name: `${tasks[j].Assignment}`,
+                });
+                acceptedCountChartData.push({
+                    x: taskAcceptedElapsedTimesForChart,
+                    y: taskAcceptedElapsedTimesForChart.map((_, i) => (interval * i + 1)),
                     type: 'scatter',
                     name: `${tasks[j].Assignment}`,
                 });
@@ -521,13 +591,72 @@
                 Plotly.newPlot(plotlyDifficultyChartId, difficultyChartData, layout, config);
 
                 window.addEventListener('resize', () => {
-                    Plotly.relayout(plotlyDifficultyChartId, { width: document.getElementById(plotlyDifficultyChartId).clientWidth });
+                    if (activeTab == 0)
+                        Plotly.relayout(plotlyDifficultyChartId, { width: document.getElementById(plotlyDifficultyChartId).clientWidth });
+                });
+            }
+
+            // Accepted Count Chart 描画
+            {
+                const yMax = participants;
+                /** @type {[number, number, string][]} */
+                const rectSpans = colors.reduce((ar, cur) => {
+                    const bottom = dc.perf2ExpectedAcceptedCount(cur[1]);
+                    if (bottom > yMax) return ar;
+                    const top = (cur[0] == 0) ? yMax : dc.perf2ExpectedAcceptedCount(cur[0]);
+                    ar.push([Math.max(0, bottom), Math.min(yMax, top), cur[2]]);
+                    return ar;
+                }, []);
+                // 描画
+                const duration = getContestDurationSec();
+                const layout = {
+                    title: 'Accepted Count',
+                    xaxis: {
+                        dtick: 60 * 10,
+                        tickformat: 'TIME',
+                        range: [0, duration],
+                        // title: { text: 'Elapsed' }
+                    },
+                    yaxis: {
+                        // dtick: 100,
+                        tickformat: 'd',
+                        range: [
+                            0,
+                            yMax
+                        ],
+                        // title: { text: 'Difficulty' }
+                    },
+                    shapes: rectSpans.map(span => {
+                        return {
+                            type: 'rect',
+                            layer: 'below',
+                            xref: 'x',
+                            yref: 'y',
+                            x0: 0,
+                            x1: duration,
+                            y0: span[0],
+                            y1: span[1],
+                            line: { width: 0 },
+                            fillcolor: span[2]
+                        };
+                    }),
+                    margin: {
+                        b: 60,
+                        t: 30,
+                    }
+                };
+                const config = { autosize: true };
+                Plotly.newPlot(plotlyLastAcceptedCountChartId, acceptedCountChartData, layout, config);
+
+                window.addEventListener('resize', () => {
+                    if (activeTab == 1)
+                        Plotly.relayout(plotlyLastAcceptedCountChartId, { width: document.getElementById(plotlyLastAcceptedCountChartId).clientWidth });
                 });
             }
 
             // LastAcceptedTime Chart 描画
             {
-                const xMax = Math.ceil(acc / 10) * 10;
+                const xMax = participants;
                 const yMax = Math.ceil((maxAcceptedTime + 60 * 5) / (60 * 10)) * (60 * 10);
                 /** @type {[number, number, string][]} */
                 const rectSpans = colors.reduce((ar, cur) => {
@@ -581,7 +710,8 @@
                 Plotly.newPlot(plotlyLastAcceptedTimeChartId, lastAcceptedTimeChartData, layout, config);
 
                 window.addEventListener('resize', () => {
-                    Plotly.relayout(plotlyLastAcceptedTimeChartId, { width: document.getElementById(plotlyLastAcceptedTimeChartId).clientWidth });
+                    if (activeTab == 2)
+                        Plotly.relayout(plotlyLastAcceptedTimeChartId, { width: document.getElementById(plotlyLastAcceptedTimeChartId).clientWidth });
                 });
             }
 
