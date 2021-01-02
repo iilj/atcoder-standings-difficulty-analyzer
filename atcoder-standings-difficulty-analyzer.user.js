@@ -256,14 +256,21 @@
      */
     const getContestDurationSec = () => (endTime - startTime) / 1000;
 
+    let working = false;
+
     /** 順位表更新時の処理：テーブル追加
      *  @type {(v: Standings) => void} */
     const onStandingsChanged = async (standings) => {
         if (!standings) return;
+        if (working) return;
+        working = true;
 
         { // remove old contents
             const oldContents = document.getElementById("acssa-contents");
-            if (oldContents) oldContents.parentNode.removeChild(oldContents);
+            if (oldContents) {
+                // oldContents.parentNode.removeChild(oldContents);
+                oldContents.remove();
+            }
         }
 
         const tasks = standings.TaskInfo;
@@ -716,7 +723,8 @@
             }
 
             document.getElementById('acssa-loader').style.display = 'none';
-        }, 100);
+            working = false;
+        }, 100); // end setTimeout()
     };
 
     // MAIN
