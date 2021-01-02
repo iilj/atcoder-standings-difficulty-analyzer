@@ -4,7 +4,7 @@
 // @version      2021.1.2.0
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
-// @supportURL   https://github.com/iilj/atcoder-standings-lang/issues
+// @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
 // @match        https://atcoder.jp/*standings*
 // @exclude      https://atcoder.jp/*standings/json
 // @require      https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js
