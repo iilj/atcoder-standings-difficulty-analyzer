@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         atcoder-standings-score-analyzer
+// @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2020.12.19.0
-// @description  順位表の得点情報を集計します
+// @version      2021.1.2.0
+// @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-lang/issues
 // @match        https://atcoder.jp/*standings*
