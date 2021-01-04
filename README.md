@@ -14,6 +14,7 @@ AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表
   - Difficulty の推移
   - AC 数の推移
   - 得点ごとの Last Accepted Time 統計
+    - 元ネタ: [https://twitter.com/yuta_game_music/status/1299708740216582145](https://twitter.com/yuta_game_music/status/1299708740216582145)
 
 ## Greasy Fork 配布ページ
 

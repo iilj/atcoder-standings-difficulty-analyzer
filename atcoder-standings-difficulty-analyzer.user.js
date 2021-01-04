@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2021.1.2.0
+// @version      2021.1.4.0
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
@@ -24,7 +24,7 @@
  * @property {number} Penalty ペナルティ数
  * @property {boolean} Pending ジャッジ中かどうか？
  * @property {number} Score 得点（×100）
- * @property {number} Status 謎
+ * @property {number} Status 1 のとき満点？ 6 のとき部分点？
  */
 
 /**
@@ -275,7 +275,7 @@
 
         const tasks = standings.TaskInfo;
         const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
-        // console.log(tasks, standings);
+        // console.log(tasks, standingsData);
 
         /** @type {Map<number, number[]>} */
         const scoreLastAcceptedTimeMap = new Map();
@@ -352,7 +352,7 @@
             }
             for (let j = 0; j < tasks.length; ++j) {
                 const taskResultEntry = standingsEntry.TaskResults[tasks[j].TaskScreenName];
-                const isAccepted = (taskResultEntry?.Score > 0);
+                const isAccepted = (taskResultEntry?.Score > 0 && taskResultEntry?.Status == 1);
                 if (isAccepted) {
                     ++taskAcceptedCounts[j];
                     taskAcceptedElapsedTimes[j].push(taskResultEntry.Elapsed / NS2SEC);
