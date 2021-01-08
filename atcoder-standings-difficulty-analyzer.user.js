@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2021.1.4.0
+// @version      2021.1.8.0
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
@@ -103,20 +103,37 @@
     margin-bottom: 1.5rem;
     border-radius: 3px;
 }
-#acssa-chart-tab {
-    margin-bottom: 0.5rem;
+#acssa-tab-wrapper {
+    display: none;
 }
-#acssa-chart-tab a {
+#acssa-chart-tab, #acssa-checkbox-tab {
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+#acssa-chart-tab a, #acssa-checkbox-tab label {
     cursor: pointer;
 }
 #acssa-chart-tab span.glyphicon {
     margin-right: 0.5rem;
+}
+#acssa-checkbox-tab label, #acssa-checkbox-tab input {
+    margin: 0;
+}
+#acssa-checkbox-tab li a {
+    color: black;
+}
+#acssa-checkbox-tab li a:hover {
+    background-color: transparent;
 }
 .acssa-chart-wrapper {
     display: none;
 }
 .acssa-chart-wrapper.acssa-chart-wrapper-active {
     display: block;
+}
+.acssa-task-checked {
+    color: green;
+    margin-left: 0.5rem;
 }
     `;
     GM_addStyle(loaderStyles + loaderWrapperStyles);
@@ -190,6 +207,17 @@
             return correctedDifficulty;
         };
     }
+
+    /** @type {(ar: number[], n: number) => number} */
+    const arrayLowerBound = (arr, n) => {
+        let first = 0, last = arr.length - 1, middle;
+        while (first <= last) {
+            middle = 0 | (first + last) / 2;
+            if (arr[middle] < n) first = middle + 1;
+            else last = middle - 1;
+        }
+        return first;
+    };
 
     /** @type {(rating: number) => string} */
     const getColor = (rating) => {
@@ -277,7 +305,8 @@
         const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
         // console.log(tasks, standingsData);
 
-        /** @type {Map<number, number[]>} */
+        /** 問題ごとの最終 AC 時刻リスト．
+         * @type {Map<number, number[]>} */
         const scoreLastAcceptedTimeMap = new Map();
 
         // コンテスト中かどうか判別する
@@ -308,6 +337,15 @@
 
         /** @type {{[key: string]: number}} */
         const innerRatingsFromPredictor = await (await fetch(`https://data.ac-predictor.com/aperfs/${contestScreenName}.json`)).json();
+
+        /** 現在のユーザの各問題の AC 時刻．
+         * @type {number[]} */
+        const yourTaskAcceptedElapsedTimes = Array(tasks.length);
+        yourTaskAcceptedElapsedTimes.fill(-1);
+        /** 現在のユーザのスコア */
+        let yourScore = -1;
+        /** 現在のユーザの最終 AC 時刻 */
+        let yourLastAcceptedTime = -1;
 
         // 順位表情報を走査する（内部レートのリストと正答時間リストを構築する）
         let participants = 0;
@@ -358,6 +396,17 @@
                     taskAcceptedElapsedTimes[j].push(taskResultEntry.Elapsed / NS2SEC);
                 }
             }
+            if (standingsEntry.UserScreenName == userScreenName) {
+                yourScore = score;
+                yourLastAcceptedTime = standingsEntry.TotalResult.Elapsed / NS2SEC;
+                for (let j = 0; j < tasks.length; ++j) {
+                    const taskResultEntry = standingsEntry.TaskResults[tasks[j].TaskScreenName];
+                    const isAccepted = (taskResultEntry?.Score > 0 && taskResultEntry?.Status == 1);
+                    if (isAccepted) {
+                        yourTaskAcceptedElapsedTimes[j] = taskResultEntry.Elapsed / NS2SEC;
+                    }
+                }
+            }
         }
         innerRatings.sort((a, b) => a - b);
 
@@ -376,14 +425,20 @@
               <tr id="acssa-tbody"></tr>
             </tbody>
           </table>
-          <ul class="nav nav-pills small" id="acssa-chart-tab">
-            <li class="active">
-              <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>Difficulty</a></li>
-            <li>
-              <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>AC Count</a></li>
-            <li>
-              <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>LastAcceptedTime</a></li>
-		  </ul>
+          <div id="acssa-tab-wrapper">
+            <ul class="nav nav-pills small" id="acssa-chart-tab">
+                <li class="active">
+                <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>Difficulty</a></li>
+                <li>
+                <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>AC Count</a></li>
+                <li>
+                <a class="acssa-chart-tab-button"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span>LastAcceptedTime</a></li>
+            </ul>
+            <ul class="nav nav-pills" id="acssa-checkbox-tab">
+              <li>
+                <a><label><input type="checkbox" id="acssa-checkbox-toggle-your-result-visibility" checked> Plot your result</label></a></li>
+            </ul>
+          </div>
           <div id="acssa-loader" class="loader acssa-loader-wrapper">
             <div class="loader-inner ball-pulse">
                 <div></div>
@@ -405,7 +460,66 @@
         </div>
         `);
 
+        // チェックボックス操作時のイベントを登録する
+        /** @type {HTMLInputElement} */
+        const checkbox = document.getElementById("acssa-checkbox-toggle-your-result-visibility");
+        checkbox.addEventListener("change", () => {
+            if (checkbox.checked) {
+                document.querySelectorAll('.acssa-task-checked').forEach(elm => {
+                    elm.style.display = 'inline';
+                });
+            } else {
+                document.querySelectorAll('.acssa-task-checked').forEach(elm => {
+                    elm.style.display = 'none';
+                });
+            }
+        });
+
         let activeTab = 0;
+        const showYourResult = [true, true, true];
+
+        let yourDifficultyChartData = null;
+        let yourAcceptedCountChartData = null;
+        let yourLastAcceptedTimeChartData = null;
+        let yourLastAcceptedTimeChartDataIndex = -1;
+        const onCheckboxChanged = () => {
+            showYourResult[activeTab] = checkbox.checked;
+            if (checkbox.checked) {
+                // show
+                switch (activeTab) {
+                    case 0:
+                        if (yourScore > 0) Plotly.addTraces(plotlyDifficultyChartId, yourDifficultyChartData);
+                        break;
+                    case 1:
+                        if (yourScore > 0) Plotly.addTraces(plotlyLastAcceptedCountChartId, yourAcceptedCountChartData);
+                        break;
+                    case 2:
+                        if (yourLastAcceptedTimeChartDataIndex != -1) {
+                            Plotly.addTraces(plotlyLastAcceptedTimeChartId, yourLastAcceptedTimeChartData, yourLastAcceptedTimeChartDataIndex);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            } else {
+                // hide
+                switch (activeTab) {
+                    case 0:
+                        if (yourScore > 0) Plotly.deleteTraces(plotlyDifficultyChartId, -1);
+                        break;
+                    case 1:
+                        if (yourScore > 0) Plotly.deleteTraces(plotlyLastAcceptedCountChartId, -1);
+                        break;
+                    case 2:
+                        if (yourLastAcceptedTimeChartDataIndex != -1) {
+                            Plotly.deleteTraces(plotlyLastAcceptedTimeChartId, yourLastAcceptedTimeChartDataIndex);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        };
         document.querySelectorAll(".acssa-chart-tab-button").forEach((btn, key) => {
             btn.addEventListener("click", () => {
                 // check whether active or not
@@ -430,6 +544,9 @@
                     default:
                         break;
                 }
+                if (showYourResult[activeTab] !== checkbox.checked) {
+                    onCheckboxChanged();
+                }
             });
         });
 
@@ -437,7 +554,10 @@
         for (let j = 0; j < tasks.length; ++j) {
             const correctedDifficulty = RatingConverter.toCorrectedRating(dc.binarySearch(taskAcceptedCounts[j]));
             document.getElementById("acssa-thead").insertAdjacentHTML("beforeend", `
-                <td>${tasks[j].Assignment}</td>
+                <td>
+                  ${tasks[j].Assignment}
+                  ${yourTaskAcceptedElapsedTimes[j] === -1 ? '' : '<span class="acssa-task-checked">✓</span>'}
+                </td>
             `);
             const id = `td-assa-difficulty-${j}`;
             document.getElementById("acssa-tbody").insertAdjacentHTML("beforeend", `
@@ -448,6 +568,12 @@
                 document.getElementById(id).insertAdjacentHTML(
                     "afterbegin", generateDifficultyCircle(correctedDifficulty));
             }
+        }
+
+        if (yourScore == -1) {
+            // disable checkbox
+            checkbox.checked = false;
+            checkbox.disabled = true;
         }
 
         // 順位表のその他の描画を優先するために，後回しにする
@@ -463,29 +589,87 @@
             });
 
             // 時系列データの準備
-            /** @type {{x: number, y: number, type: string, name: string}[]} */
+            /** Difficulty Chart のデータ
+             * @type {{x: number, y: number, type: string, name: string}[]} */
             const difficultyChartData = [];
+            /** AC Count Chart のデータ
+             * @type {{x: number, y: number, type: string, name: string}[]} */
             const acceptedCountChartData = [];
+
             for (let j = 0; j < tasks.length; ++j) { // 
-                const interval = Math.ceil(taskAcceptedCounts[j] / 160);
-                /** @type {number[]} */
-                const taskAcceptedElapsedTimesForChart = taskAcceptedElapsedTimes[j].reduce((ar, tm, idx) => {
-                    if (idx % interval == 0 || idx == taskAcceptedCounts[j] - 1) ar.push(tm);
-                    return ar;
-                }, []);
+                const interval = Math.ceil(taskAcceptedCounts[j] / 140);
+                /** @type {[number[], number[]]} */
+                const [taskAcceptedElapsedTimesForChart, taskAcceptedCountsForChart] = taskAcceptedElapsedTimes[j].reduce(
+                    ([ar, arr], tm, idx) => {
+                        const tmpInterval = Math.max(1, Math.min(Math.ceil(idx / 10), interval));
+                        if (idx % tmpInterval == 0 || idx == taskAcceptedCounts[j] - 1) {
+                            ar.push(tm);
+                            arr.push(idx + 1);
+                        }
+                        return [ar, arr];
+                    },
+                    [[], []]
+                );
 
                 difficultyChartData.push({
                     x: taskAcceptedElapsedTimesForChart,
-                    y: taskAcceptedElapsedTimesForChart.map((_, i) => dc.binarySearch(interval * i + 1)),
+                    y: taskAcceptedCountsForChart.map(taskAcceptedCountForChart => dc.binarySearch(taskAcceptedCountForChart)),
                     type: 'scatter',
                     name: `${tasks[j].Assignment}`,
                 });
                 acceptedCountChartData.push({
                     x: taskAcceptedElapsedTimesForChart,
-                    y: taskAcceptedElapsedTimesForChart.map((_, i) => (interval * i + 1)),
+                    y: taskAcceptedCountsForChart,
                     type: 'scatter',
                     name: `${tasks[j].Assignment}`,
                 });
+            }
+
+            // 現在のユーザのデータを追加
+            const yourMarker = {
+                size: 10,
+                symbol: "cross",
+                color: 'red',
+                line: {
+                    color: 'white',
+                    width: 1,
+                },
+            };
+            if (yourScore !== -1) {
+                /** @type {number[]} */
+                const yourAcceptedTimes = [];
+                /** @type {number[]} */
+                const yourAcceptedDifficulties = [];
+                /** @type {number[]} */
+                const yourAcceptedCounts = [];
+
+                for (let j = 0; j < tasks.length; ++j) {
+                    if (yourTaskAcceptedElapsedTimes[j] !== -1) {
+                        yourAcceptedTimes.push(yourTaskAcceptedElapsedTimes[j]);
+                        const yourAcceptedCount = arrayLowerBound(taskAcceptedElapsedTimes[j], yourTaskAcceptedElapsedTimes[j]) + 1;
+                        yourAcceptedCounts.push(yourAcceptedCount);
+                        yourAcceptedDifficulties.push(dc.binarySearch(yourAcceptedCount));
+                    }
+                }
+
+                yourDifficultyChartData = {
+                    x: yourAcceptedTimes,
+                    y: yourAcceptedDifficulties,
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: `${userScreenName}`,
+                    marker: yourMarker,
+                };
+                yourAcceptedCountChartData = {
+                    x: yourAcceptedTimes,
+                    y: yourAcceptedCounts,
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: `${userScreenName}`,
+                    marker: yourMarker,
+                };
+                difficultyChartData.push(yourDifficultyChartData);
+                acceptedCountChartData.push(yourAcceptedCountChartData);
             }
 
             // 得点と提出時間データの準備
@@ -515,6 +699,20 @@
                     type: 'scatter',
                     name: `${score}`,
                 });
+
+                if (score === yourScore) {
+                    const lastAcceptedTimesRank = arrayLowerBound(lastAcceptedTimes, yourLastAcceptedTime);
+                    yourLastAcceptedTimeChartData = {
+                        x: [acc + lastAcceptedTimesRank + 1],
+                        y: [yourLastAcceptedTime],
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: `${userScreenName}`,
+                        marker: yourMarker,
+                    };
+                    yourLastAcceptedTimeChartDataIndex = lastAcceptedTimeChartData.length + 0;
+                    lastAcceptedTimeChartData.push(yourLastAcceptedTimeChartData);
+                }
 
                 acc += lastAcceptedTimes.length;
                 if (lastAcceptedTimes[lastAcceptedTimes.length - 1] > maxAcceptedTime) {
@@ -611,7 +809,8 @@
                     const bottom = dc.perf2ExpectedAcceptedCount(cur[1]);
                     if (bottom > yMax) return ar;
                     const top = (cur[0] == 0) ? yMax : dc.perf2ExpectedAcceptedCount(cur[0]);
-                    ar.push([Math.max(0, bottom), Math.min(yMax, top), cur[2]]);
+                    if (top < 0.5) return ar;
+                    ar.push([Math.max(0.5, bottom), Math.min(yMax, top), cur[2]]);
                     return ar;
                 }, []);
                 // 描画
@@ -625,12 +824,17 @@
                         // title: { text: 'Elapsed' }
                     },
                     yaxis: {
+                        // type: 'log',
                         // dtick: 100,
                         tickformat: 'd',
                         range: [
                             0,
                             yMax
                         ],
+                        // range: [
+                        //     Math.log10(0.5),
+                        //     Math.log10(yMax)
+                        // ],
                         // title: { text: 'Difficulty' }
                     },
                     shapes: rectSpans.map(span => {
@@ -722,7 +926,11 @@
                 });
             }
 
+            // 現在のユーザの結果表示・非表示 toggle
+            checkbox.addEventListener('change', onCheckboxChanged);
+
             document.getElementById('acssa-loader').style.display = 'none';
+            document.getElementById('acssa-tab-wrapper').style.display = 'block';
             working = false;
         }, 100); // end setTimeout()
     };
