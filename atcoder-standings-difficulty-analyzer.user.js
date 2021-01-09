@@ -43,7 +43,7 @@
  * 順位表エントリ
  * @typedef {Object} StandingsEntry
  * @property {any} Additional 謎
- * @property {string} Affiliation 所属
+ * @property {string} Affiliation 所属．IsTeam = true のときは，チームメンバを「, 」で結合した文字列．
  * @property {number} AtCoderRank AtCoder 内順位
  * @property {number} Competitions Rated コンテスト参加回数
  * @property {string} Country 国ラベル．"JP" など．
@@ -51,7 +51,7 @@
  * @property {number} EntireRank コンテスト順位？
  * @property {boolean} IsRated Rated かどうか
  * @property {boolean} IsTeam チームかどうか
- * @property {number} OldRating コンテスト前のレーティング
+ * @property {number} OldRating コンテスト前のレーティング．コンテスト後のみ有効．
  * @property {number} Rank コンテスト順位？
  * @property {number} Rating コンテスト後のレーティング
  * @property {{[key: string]: TaskResultEntry}} TaskResults 問題ごとの結果．参加登録していない人は空．
@@ -110,7 +110,7 @@
     margin-bottom: 0.5rem;
     display: inline-block;
 }
-#acssa-chart-tab a, #acssa-checkbox-tab label {
+#acssa-chart-tab a, #acssa-checkbox-tab label, #acssa-checkbox-tab label input {
     cursor: pointer;
 }
 #acssa-chart-tab span.glyphicon {
@@ -134,6 +134,9 @@
 .acssa-task-checked {
     color: green;
     margin-left: 0.5rem;
+}
+#acssa-checkbox-toggle-log-plot-parent {
+    display: none;
 }
     `;
     GM_addStyle(loaderStyles + loaderWrapperStyles);
@@ -282,7 +285,26 @@
     /** 現在のページから，コンテストの開始から終了までの秒数を抽出する
      * @type {() => number}
      */
-    const getContestDurationSec = () => (endTime - startTime) / 1000;
+    const getContestDurationSec = () => {
+        if (contestScreenName.startsWith("past")) {
+            return 300 * 60;
+        }
+        return (endTime - startTime) / 1000;
+    };
+
+    /** @type {(contestScreenName: string) => number} */
+    const getCenterOfInnerRating = (contestScreenName) => {
+        if (contestScreenName.startsWith("agc")) {
+            const contestNumber = Number(contestScreenName.substring(3, 6));
+            return (contestNumber >= 34) ? 1200 : 1600;
+        }
+        if (contestScreenName.startsWith("arc")) {
+            const contestNumber = Number(contestScreenName.substring(3, 6));
+            return (contestNumber >= 104) ? 1000 : 1600;
+        }
+        return 800;
+    };
+    const centerOfInnerRating = getCenterOfInnerRating(contestScreenName);
 
     let working = false;
 
@@ -303,7 +325,7 @@
 
         const tasks = standings.TaskInfo;
         const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
-        // console.log(tasks, standingsData);
+        console.log(standings);
 
         /** 問題ごとの最終 AC 時刻リスト．
          * @type {Map<number, number[]>} */
@@ -336,7 +358,15 @@
         const NS2SEC = 1000000000;
 
         /** @type {{[key: string]: number}} */
-        const innerRatingsFromPredictor = await (await fetch(`https://data.ac-predictor.com/aperfs/${contestScreenName}.json`)).json();
+        const innerRatingsFromPredictor = await (async () => {
+            try {
+                const res = await fetch(`https://data.ac-predictor.com/aperfs/${contestScreenName}.json`);
+                if (res.ok) return await res.json();
+            } catch (e) {
+                console.warn(e);
+            }
+            return {};
+        })();
 
         /** 現在のユーザの各問題の AC 時刻．
          * @type {number[]} */
@@ -354,9 +384,12 @@
 
             if (!standingsEntry.TaskResults) continue; // 参加登録していない
             if (standingsEntry.UserIsDeleted) continue; // アカウント削除
-            const correctedRating = isDuringContest ? standingsEntry.Rating : standingsEntry.OldRating;
-            if (correctedRating === 0) continue; // 初参加
-            participants++;
+            let correctedRating = isDuringContest ? standingsEntry.Rating : standingsEntry.OldRating;
+            const isTeamOrBeginner = (correctedRating === 0);
+            if (isTeamOrBeginner) {
+                // continue; // 初参加 or チーム
+                correctedRating = centerOfInnerRating;
+            }
 
             // これは飛ばしちゃダメ（提出しても 0 AC だと Penalty == 0 なので）
             // if (standingsEntry.TotalResult.Score == 0 && standingsEntry.TotalResult.Penalty == 0) continue;
@@ -370,6 +403,7 @@
                 penalty += (taskResultEntry.Score === 0 ? taskResultEntry.Failure : taskResultEntry.Penalty);
             }
             if (score === 0 && penalty === 0) continue; // NoSub を飛ばす
+            participants++;
             // console.log(i + 1, score, penalty);
 
             score /= 100;
@@ -379,13 +413,15 @@
                 scoreLastAcceptedTimeMap.set(score, [standingsEntry.TotalResult.Elapsed / NS2SEC]);
             }
 
-            const innerRating = (standingsEntry.UserScreenName in innerRatingsFromPredictor)
-                ? innerRatingsFromPredictor[standingsEntry.UserScreenName]
-                : RatingConverter.toInnerRating(
-                    Math.max(RatingConverter.toRealRating(correctedRating), 1), standingsEntry.Competitions);
+            const innerRating = isTeamOrBeginner
+                ? correctedRating
+                : (standingsEntry.UserScreenName in innerRatingsFromPredictor)
+                    ? innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                    : RatingConverter.toInnerRating(
+                        Math.max(RatingConverter.toRealRating(correctedRating), 1), standingsEntry.Competitions);
             if (innerRating) innerRatings.push(innerRating);
             else {
-                console.log(i, innerRating, rating, standingsEntry.Competitions);
+                console.log(i, innerRating, correctedRating, standingsEntry.Competitions);
                 continue;
             }
             for (let j = 0; j < tasks.length; ++j) {
@@ -413,7 +449,7 @@
         const dc = new DifficultyCalculator(innerRatings);
 
         const plotlyDifficultyChartId = 'acssa-mydiv-difficulty';
-        const plotlyLastAcceptedCountChartId = 'acssa-mydiv-accepted-count';
+        const plotlyAcceptedCountChartId = 'acssa-mydiv-accepted-count';
         const plotlyLastAcceptedTimeChartId = 'acssa-mydiv-accepted-time';
         $('#vue-standings').prepend(`
         <div id="acssa-contents">
@@ -437,6 +473,8 @@
             <ul class="nav nav-pills" id="acssa-checkbox-tab">
               <li>
                 <a><label><input type="checkbox" id="acssa-checkbox-toggle-your-result-visibility" checked> Plot your result</label></a></li>
+              <li id="acssa-checkbox-toggle-log-plot-parent">
+                <a><label><input type="checkbox" id="acssa-checkbox-toggle-log-plot" checked>Log plot</label></a></li>
             </ul>
           </div>
           <div id="acssa-loader" class="loader acssa-loader-wrapper">
@@ -450,8 +488,8 @@
             <div class="acssa-chart-wrapper acssa-chart-wrapper-active" id="${plotlyDifficultyChartId}-wrapper">
                 <div id="${plotlyDifficultyChartId}" style="width:100%;"></div>
             </div>
-            <div class="acssa-chart-wrapper" id="${plotlyLastAcceptedCountChartId}-wrapper">
-                <div id="${plotlyLastAcceptedCountChartId}" style="width:100%;"></div>
+            <div class="acssa-chart-wrapper" id="${plotlyAcceptedCountChartId}-wrapper">
+                <div id="${plotlyAcceptedCountChartId}" style="width:100%;"></div>
             </div>
             <div class="acssa-chart-wrapper" id="${plotlyLastAcceptedTimeChartId}-wrapper">
                 <div id="${plotlyLastAcceptedTimeChartId}" style="width:100%;"></div>
@@ -491,7 +529,7 @@
                         if (yourScore > 0) Plotly.addTraces(plotlyDifficultyChartId, yourDifficultyChartData);
                         break;
                     case 1:
-                        if (yourScore > 0) Plotly.addTraces(plotlyLastAcceptedCountChartId, yourAcceptedCountChartData);
+                        if (yourScore > 0) Plotly.addTraces(plotlyAcceptedCountChartId, yourAcceptedCountChartData);
                         break;
                     case 2:
                         if (yourLastAcceptedTimeChartDataIndex != -1) {
@@ -508,7 +546,7 @@
                         if (yourScore > 0) Plotly.deleteTraces(plotlyDifficultyChartId, -1);
                         break;
                     case 1:
-                        if (yourScore > 0) Plotly.deleteTraces(plotlyLastAcceptedCountChartId, -1);
+                        if (yourScore > 0) Plotly.deleteTraces(plotlyAcceptedCountChartId, -1);
                         break;
                     case 2:
                         if (yourLastAcceptedTimeChartDataIndex != -1) {
@@ -520,6 +558,11 @@
                 }
             }
         };
+
+        /** @type {HTMLInputElement} */
+        const logPlotCheckbox = document.getElementById('acssa-checkbox-toggle-log-plot');
+        const logPlotCheckboxParent = document.getElementById('acssa-checkbox-toggle-log-plot-parent');
+
         document.querySelectorAll(".acssa-chart-tab-button").forEach((btn, key) => {
             btn.addEventListener("click", () => {
                 // check whether active or not
@@ -534,12 +577,15 @@
                 switch (key) {
                     case 0:
                         Plotly.relayout(plotlyDifficultyChartId, { width: document.getElementById(plotlyDifficultyChartId).clientWidth });
+                        logPlotCheckboxParent.style.display = 'none';
                         break;
                     case 1:
-                        Plotly.relayout(plotlyLastAcceptedCountChartId, { width: document.getElementById(plotlyLastAcceptedCountChartId).clientWidth });
+                        Plotly.relayout(plotlyAcceptedCountChartId, { width: document.getElementById(plotlyAcceptedCountChartId).clientWidth });
+                        logPlotCheckboxParent.style.display = 'block';
                         break;
                     case 2:
                         Plotly.relayout(plotlyLastAcceptedTimeChartId, { width: document.getElementById(plotlyLastAcceptedTimeChartId).clientWidth });
+                        logPlotCheckboxParent.style.display = 'none';
                         break;
                     default:
                         break;
@@ -548,6 +594,36 @@
                     onCheckboxChanged();
                 }
             });
+        });
+
+        let acceptedCountYMax = -1;
+        logPlotCheckbox.addEventListener('change', () => {
+            if (acceptedCountYMax == -1) return;
+            if (logPlotCheckbox.checked) {
+                // log plot
+                const layout = {
+                    yaxis: {
+                        type: 'log',
+                        range: [
+                            Math.log10(0.5),
+                            Math.log10(acceptedCountYMax)
+                        ],
+                    },
+                };
+                Plotly.relayout(plotlyAcceptedCountChartId, layout);
+            } else {
+                // linear plot
+                const layout = {
+                    yaxis: {
+                        type: 'linear',
+                        range: [
+                            0,
+                            acceptedCountYMax
+                        ],
+                    },
+                };
+                Plotly.relayout(plotlyAcceptedCountChartId, layout);
+            }
         });
 
         // 現在の Difficulty テーブルを構築する
@@ -574,6 +650,8 @@
             // disable checkbox
             checkbox.checked = false;
             checkbox.disabled = true;
+            checkbox.parentElement.style.cursor = 'default';
+            checkbox.parentElement.style.textDecoration = 'line-through';
         }
 
         // 順位表のその他の描画を優先するために，後回しにする
@@ -720,6 +798,9 @@
                 }
             });
 
+            const duration = getContestDurationSec();
+            const xtick = (60 * 10) * Math.max(1, Math.ceil(duration / (60 * 10 * 20))); // 10 分を最小単位にする
+
             // 軸フォーマットをカスタムする
             // Support specifying a function for tickformat · Issue #1464 · plotly/plotly.js
             // https://github.com/plotly/plotly.js/issues/1464#issuecomment-498050894
@@ -755,11 +836,10 @@
             // Difficulty Chart 描画
             {
                 // 描画
-                const duration = getContestDurationSec();
                 const layout = {
                     title: 'Difficulty',
                     xaxis: {
-                        dtick: 60 * 10,
+                        dtick: xtick,
                         tickformat: 'TIME',
                         range: [0, duration],
                         // title: { text: 'Elapsed' }
@@ -803,38 +883,37 @@
 
             // Accepted Count Chart 描画
             {
-                const yMax = participants;
+                acceptedCountYMax = participants;
                 /** @type {[number, number, string][]} */
                 const rectSpans = colors.reduce((ar, cur) => {
                     const bottom = dc.perf2ExpectedAcceptedCount(cur[1]);
-                    if (bottom > yMax) return ar;
-                    const top = (cur[0] == 0) ? yMax : dc.perf2ExpectedAcceptedCount(cur[0]);
+                    if (bottom > acceptedCountYMax) return ar;
+                    const top = (cur[0] == 0) ? acceptedCountYMax : dc.perf2ExpectedAcceptedCount(cur[0]);
                     if (top < 0.5) return ar;
-                    ar.push([Math.max(0.5, bottom), Math.min(yMax, top), cur[2]]);
+                    ar.push([Math.max(0.5, bottom), Math.min(acceptedCountYMax, top), cur[2]]);
                     return ar;
                 }, []);
                 // 描画
-                const duration = getContestDurationSec();
                 const layout = {
                     title: 'Accepted Count',
                     xaxis: {
-                        dtick: 60 * 10,
+                        dtick: xtick,
                         tickformat: 'TIME',
                         range: [0, duration],
                         // title: { text: 'Elapsed' }
                     },
                     yaxis: {
-                        // type: 'log',
+                        type: 'log',
                         // dtick: 100,
                         tickformat: 'd',
-                        range: [
-                            0,
-                            yMax
-                        ],
                         // range: [
-                        //     Math.log10(0.5),
-                        //     Math.log10(yMax)
+                        //     0,
+                        //     acceptedCountYMax
                         // ],
+                        range: [
+                            Math.log10(0.5),
+                            Math.log10(acceptedCountYMax)
+                        ],
                         // title: { text: 'Difficulty' }
                     },
                     shapes: rectSpans.map(span => {
@@ -857,18 +936,18 @@
                     }
                 };
                 const config = { autosize: true };
-                Plotly.newPlot(plotlyLastAcceptedCountChartId, acceptedCountChartData, layout, config);
+                Plotly.newPlot(plotlyAcceptedCountChartId, acceptedCountChartData, layout, config);
 
                 window.addEventListener('resize', () => {
                     if (activeTab == 1)
-                        Plotly.relayout(plotlyLastAcceptedCountChartId, { width: document.getElementById(plotlyLastAcceptedCountChartId).clientWidth });
+                        Plotly.relayout(plotlyAcceptedCountChartId, { width: document.getElementById(plotlyAcceptedCountChartId).clientWidth });
                 });
             }
 
             // LastAcceptedTime Chart 描画
             {
                 const xMax = participants;
-                const yMax = Math.ceil((maxAcceptedTime + 60 * 5) / (60 * 10)) * (60 * 10);
+                const yMax = Math.ceil((maxAcceptedTime + xtick / 2) / xtick) * xtick;
                 /** @type {[number, number, string][]} */
                 const rectSpans = colors.reduce((ar, cur) => {
                     const right = (cur[0] == 0) ? xMax : dc.perf2Ranking(cur[0]);
@@ -889,7 +968,7 @@
                         // title: { text: 'Elapsed' }
                     },
                     yaxis: {
-                        dtick: 60 * 10,
+                        dtick: xtick,
                         tickformat: 'TIME',
                         range: [0, yMax],
                         // range: [
