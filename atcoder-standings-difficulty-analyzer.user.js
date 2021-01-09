@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2021.1.8.0
+// @version      2021.1.9.0
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
@@ -307,13 +307,21 @@
     const centerOfInnerRating = getCenterOfInnerRating(contestScreenName);
 
     let working = false;
+    let oldStandingsData = null;
 
     /** 順位表更新時の処理：テーブル追加
      *  @type {(v: Standings) => void} */
     const onStandingsChanged = async (standings) => {
         if (!standings) return;
         if (working) return;
+
+        const tasks = standings.TaskInfo;
+        const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
+
+        if (oldStandingsData === standingsData) return;
+        oldStandingsData = standingsData;
         working = true;
+        // console.log(standings);
 
         { // remove old contents
             const oldContents = document.getElementById("acssa-contents");
@@ -322,10 +330,6 @@
                 oldContents.remove();
             }
         }
-
-        const tasks = standings.TaskInfo;
-        const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
-        console.log(standings);
 
         /** 問題ごとの最終 AC 時刻リスト．
          * @type {Map<number, number[]>} */
@@ -474,7 +478,7 @@
               <li>
                 <a><label><input type="checkbox" id="acssa-checkbox-toggle-your-result-visibility" checked> Plot your result</label></a></li>
               <li id="acssa-checkbox-toggle-log-plot-parent">
-                <a><label><input type="checkbox" id="acssa-checkbox-toggle-log-plot" checked>Log plot</label></a></li>
+                <a><label><input type="checkbox" id="acssa-checkbox-toggle-log-plot">Log plot</label></a></li>
             </ul>
           </div>
           <div id="acssa-loader" class="loader acssa-loader-wrapper">
@@ -563,6 +567,66 @@
         const logPlotCheckbox = document.getElementById('acssa-checkbox-toggle-log-plot');
         const logPlotCheckboxParent = document.getElementById('acssa-checkbox-toggle-log-plot-parent');
 
+        let acceptedCountYMax = -1;
+        const useLogPlot = [false, false, false];
+        const onLogPlotCheckboxChanged = () => {
+            if (acceptedCountYMax == -1) return;
+            useLogPlot[activeTab] = logPlotCheckbox.checked;
+            if (activeTab == 1) {
+                if (logPlotCheckbox.checked) {
+                    // log plot
+                    const layout = {
+                        yaxis: {
+                            type: 'log',
+                            range: [
+                                Math.log10(0.5),
+                                Math.log10(acceptedCountYMax)
+                            ],
+                        },
+                    };
+                    Plotly.relayout(plotlyAcceptedCountChartId, layout);
+                } else {
+                    // linear plot
+                    const layout = {
+                        yaxis: {
+                            type: 'linear',
+                            range: [
+                                0,
+                                acceptedCountYMax
+                            ],
+                        },
+                    };
+                    Plotly.relayout(plotlyAcceptedCountChartId, layout);
+                }
+            } else if (activeTab == 2) {
+                if (logPlotCheckbox.checked) {
+                    // log plot
+                    const layout = {
+                        xaxis: {
+                            type: 'log',
+                            range: [
+                                Math.log10(0.5),
+                                Math.log10(participants)
+                            ],
+                        },
+                    };
+                    Plotly.relayout(plotlyLastAcceptedTimeChartId, layout);
+                } else {
+                    // linear plot
+                    const layout = {
+                        xaxis: {
+                            type: 'linear',
+                            range: [
+                                0,
+                                participants
+                            ],
+                        },
+                    };
+                    Plotly.relayout(plotlyLastAcceptedTimeChartId, layout);
+                }
+            }
+        };
+
         document.querySelectorAll(".acssa-chart-tab-button").forEach((btn, key) => {
             btn.addEventListener("click", () => {
                 // check whether active or not
@@ -585,7 +649,7 @@
                         break;
                     case 2:
                         Plotly.relayout(plotlyLastAcceptedTimeChartId, { width: document.getElementById(plotlyLastAcceptedTimeChartId).clientWidth });
-                        logPlotCheckboxParent.style.display = 'none';
+                        logPlotCheckboxParent.style.display = 'block';
                         break;
                     default:
                         break;
@@ -593,38 +657,13 @@
                 if (showYourResult[activeTab] !== checkbox.checked) {
                     onCheckboxChanged();
                 }
+                if (activeTab !== 0 && useLogPlot[activeTab] !== logPlotCheckbox.checked) {
+                    onLogPlotCheckboxChanged();
+                }
             });
         });
 
-        let acceptedCountYMax = -1;
-        logPlotCheckbox.addEventListener('change', () => {
-            if (acceptedCountYMax == -1) return;
-            if (logPlotCheckbox.checked) {
-                // log plot
-                const layout = {
-                    yaxis: {
-                        type: 'log',
-                        range: [
-                            Math.log10(0.5),
-                            Math.log10(acceptedCountYMax)
-                        ],
-                    },
-                };
-                Plotly.relayout(plotlyAcceptedCountChartId, layout);
-            } else {
-                // linear plot
-                const layout = {
-                    yaxis: {
-                        type: 'linear',
-                        range: [
-                            0,
-                            acceptedCountYMax
-                        ],
-                    },
-                };
-                Plotly.relayout(plotlyAcceptedCountChartId, layout);
-            }
-        });
+        logPlotCheckbox.addEventListener('change', onLogPlotCheckboxChanged);
 
         // 現在の Difficulty テーブルを構築する
         for (let j = 0; j < tasks.length; ++j) {
@@ -903,17 +942,17 @@
                         // title: { text: 'Elapsed' }
                     },
                     yaxis: {
-                        type: 'log',
+                        // type: 'log',
                         // dtick: 100,
                         tickformat: 'd',
-                        // range: [
-                        //     0,
-                        //     acceptedCountYMax
-                        // ],
                         range: [
-                            Math.log10(0.5),
-                            Math.log10(acceptedCountYMax)
+                            0,
+                            acceptedCountYMax
                         ],
+                        // range: [
+                        //     Math.log10(0.5),
+                        //     Math.log10(acceptedCountYMax)
+                        // ],
                         // title: { text: 'Difficulty' }
                     },
                     shapes: rectSpans.map(span => {
