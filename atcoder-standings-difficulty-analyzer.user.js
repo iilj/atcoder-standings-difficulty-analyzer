@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2021.1.9.0
+// @version      2021.4.30.0
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
@@ -86,12 +86,12 @@
     // loader のスタイル設定
     const loaderStyles = GM_getResourceText("loaders.min.css");
     const loaderWrapperStyles = `
-#acssa-table {
+.acssa-table {
     width: 100%;
     table-layout: fixed;
     margin-bottom: 1.5rem;
 }
-#acssa-thead {
+.acssa-thead {
     font-weight: bold;
 }
 .acssa-loader-wrapper {
@@ -455,16 +455,19 @@
         const plotlyDifficultyChartId = 'acssa-mydiv-difficulty';
         const plotlyAcceptedCountChartId = 'acssa-mydiv-accepted-count';
         const plotlyLastAcceptedTimeChartId = 'acssa-mydiv-accepted-time';
+        const COL_PER_ROW = 20;
         $('#vue-standings').prepend(`
         <div id="acssa-contents">
-          <table id="acssa-table" class="table table-bordered table-hover th-center td-center td-middle">
+          ${[...Array(Math.ceil(tasks.length / COL_PER_ROW)).keys()].map(tableIdx => `
+          <table id="acssa-table-${tableIdx}" class="table table-bordered table-hover th-center td-center td-middle acssa-table">
             <tbody>
-              <tr id="acssa-thead"></tr>
+              <tr id="acssa-thead-${tableIdx}" class="acssa-thead"></tr>
             </tbody>
             <tbody>
-              <tr id="acssa-tbody"></tr>
+              <tr id="acssa-tbody-${tableIdx}" class="acssa-tbody"></tr>
             </tbody>
           </table>
+          `).join('')}
           <div id="acssa-tab-wrapper">
             <ul class="nav nav-pills small" id="acssa-chart-tab">
                 <li class="active">
@@ -667,15 +670,16 @@
 
         // 現在の Difficulty テーブルを構築する
         for (let j = 0; j < tasks.length; ++j) {
+            const tableIdx = Math.floor(j / COL_PER_ROW);
             const correctedDifficulty = RatingConverter.toCorrectedRating(dc.binarySearch(taskAcceptedCounts[j]));
-            document.getElementById("acssa-thead").insertAdjacentHTML("beforeend", `
+            document.getElementById(`acssa-thead-${tableIdx}`).insertAdjacentHTML("beforeend", `
                 <td>
                   ${tasks[j].Assignment}
                   ${yourTaskAcceptedElapsedTimes[j] === -1 ? '' : '<span class="acssa-task-checked">✓</span>'}
                 </td>
             `);
             const id = `td-assa-difficulty-${j}`;
-            document.getElementById("acssa-tbody").insertAdjacentHTML("beforeend", `
+            document.getElementById(`acssa-tbody-${tableIdx}`).insertAdjacentHTML("beforeend", `
                 <td id="${id}" style="color:${getColor(correctedDifficulty)};">
                 ${correctedDifficulty === 9999 ? '-' : correctedDifficulty}</td>
             `);
