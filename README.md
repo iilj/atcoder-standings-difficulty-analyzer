@@ -43,3 +43,6 @@ Tampermonkey 等で読み込んで使用してください．
 - 2021.4.30.0
   - Difficulty テーブルを20問ごとに改行するように変更
     - [競プロ典型 90 問 \- AtCoder](https://atcoder.jp/contests/typical90) で横 1 列に 90 問が並ぶのを回避するため
+- 2021.4.30.1
+  - Plot your result 有効時，Difficulty テーブル内の AC 済み問題の背景を緑で塗るように変更
+    - これに伴い，チェックマーク（✓）の表示は廃止

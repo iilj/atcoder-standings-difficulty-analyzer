@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2021.4.30.0
+// @version      2021.4.30.1
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
@@ -131,9 +131,8 @@
 .acssa-chart-wrapper.acssa-chart-wrapper-active {
     display: block;
 }
-.acssa-task-checked {
-    color: green;
-    margin-left: 0.5rem;
+.table>tbody>tr>td.success.acssa-task-success.acssa-task-success-suppress {
+    background-color: transparent;
 }
 #acssa-checkbox-toggle-log-plot-parent {
     display: none;
@@ -510,12 +509,12 @@
         const checkbox = document.getElementById("acssa-checkbox-toggle-your-result-visibility");
         checkbox.addEventListener("change", () => {
             if (checkbox.checked) {
-                document.querySelectorAll('.acssa-task-checked').forEach(elm => {
-                    elm.style.display = 'inline';
+                document.querySelectorAll('.acssa-task-success.acssa-task-success-suppress').forEach(elm => {
+                    elm.classList.remove('acssa-task-success-suppress');
                 });
             } else {
-                document.querySelectorAll('.acssa-task-checked').forEach(elm => {
-                    elm.style.display = 'none';
+                document.querySelectorAll('.acssa-task-success').forEach(elm => {
+                    elm.classList.add('acssa-task-success-suppress');
                 });
             }
         });
@@ -672,15 +671,15 @@
         for (let j = 0; j < tasks.length; ++j) {
             const tableIdx = Math.floor(j / COL_PER_ROW);
             const correctedDifficulty = RatingConverter.toCorrectedRating(dc.binarySearch(taskAcceptedCounts[j]));
+            const tdClass = yourTaskAcceptedElapsedTimes[j] === -1 ? '' : 'class="success acssa-task-success"';
             document.getElementById(`acssa-thead-${tableIdx}`).insertAdjacentHTML("beforeend", `
-                <td>
+                <td ${tdClass}>
                   ${tasks[j].Assignment}
-                  ${yourTaskAcceptedElapsedTimes[j] === -1 ? '' : '<span class="acssa-task-checked">✓</span>'}
                 </td>
             `);
             const id = `td-assa-difficulty-${j}`;
             document.getElementById(`acssa-tbody-${tableIdx}`).insertAdjacentHTML("beforeend", `
-                <td id="${id}" style="color:${getColor(correctedDifficulty)};">
+                <td ${tdClass} id="${id}" style="color:${getColor(correctedDifficulty)};">
                 ${correctedDifficulty === 9999 ? '-' : correctedDifficulty}</td>
             `);
             if (correctedDifficulty !== 9999) {
