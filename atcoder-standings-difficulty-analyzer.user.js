@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         atcoder-standings-difficulty-analyzer
 // @namespace    iilj
-// @version      2021.4.30.1
+// @version      2021.6.27.0
 // @description  順位表の得点情報を集計し，推定 difficulty やその推移を表示します．
 // @author       iilj
 // @supportURL   https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues
@@ -78,9 +78,9 @@
  * @property {TaskInfoEntry[]} TaskInfo 問題データ
  */
 
-/* globals vueStandings, $, contestScreenName, startTime, endTime, userScreenName, Plotly */
+/* globals vueStandings, $, contestScreenName, startTime, endTime, moment, userScreenName, Plotly */
 
-(() => {
+(async () => {
     'use strict';
 
     // loader のスタイル設定
@@ -305,6 +305,33 @@
     };
     const centerOfInnerRating = getCenterOfInnerRating(contestScreenName);
 
+    // AC 数推移モデルファイルを取得する
+    let modelLocation = undefined;
+    /** @type{{[key:string]: number[]}} */
+    let acRatioModel = undefined;
+    if (moment() < endTime) {
+        const contestDurationMinutes = (endTime - startTime) / 1000 / 60;
+        if (contestScreenName.match(/^agc(\d{3,})$/)) {
+            if (contestDurationMinutes == 150) {
+                modelLocation = 'https://gist.githubusercontent.com/iilj/1b4b6674a2e477e7a06fa4595ccfa9fe/raw/dd479d874fc22395fc6a701aa22a4abc10f2e4f3/standings_agc_150m.json';
+            }
+        } else if (contestScreenName.match(/^arc(\d{3,})$/)) {
+            if (contestDurationMinutes == 120) {
+                modelLocation = 'https://gist.githubusercontent.com/iilj/8bfd3279ddc7d94e64239a2ae3e7ca4c/raw/0f3d11d12c5ba984dce4fb8d5487b3dcafa41189/standings_arc_120m.json';
+            } else if (contestDurationMinutes == 100) {
+                modelLocation = 'https://gist.githubusercontent.com/iilj/e580811a2c7a6e5c91dcf99704cbf6f4/raw/49938a5b6f8ca623a2e89f57410789e56d02149a/standings_arc_100m.json';
+            }
+        } else if (contestScreenName.match(/^abc(\d{3,})$/)) {
+            if (contestDurationMinutes == 100) {
+                modelLocation = 'https://gist.githubusercontent.com/iilj/9c4db3cc1034c4a62e7cdb3a63d5f4d5/raw/17a13ff322c176c35cd0626af05af15815047ddd/standings_abc_100m.json';
+            }
+        }
+        if (modelLocation !== undefined) {
+            const acRatioModelFetchResult = await fetch(modelLocation);
+            acRatioModel = await acRatioModelFetchResult.json();
+        }
+    }
+
     let working = false;
     let oldStandingsData = null;
 
@@ -318,6 +345,7 @@
         const standingsData = standings.StandingsData; // vueStandings.filteredStandings;
 
         if (oldStandingsData === standingsData) return;
+        if (tasks.length === 0) return;
         oldStandingsData = standingsData;
         working = true;
         // console.log(standings);
@@ -329,6 +357,11 @@
                 oldContents.remove();
             }
         }
+
+        /** @type {number} */
+        const currentTime = moment();
+        const elapsedMinutes = Math.floor(currentTime.diff(startTime) / 60 / 1000);
+        const estimationIsEnabled = (startTime < currentTime && currentTime < endTime && elapsedMinutes >= 1 && tasks.length < 10);
 
         /** 問題ごとの最終 AC 時刻リスト．
          * @type {Map<number, number[]>} */
@@ -449,6 +482,54 @@
         }
         innerRatings.sort((a, b) => a - b);
 
+        /** @type {number[]} */
+        const acCountPredicted = (!estimationIsEnabled) ? [] : (() => {
+            // 時間ごとの AC 数推移を計算する
+            const taskAcceptedCountImos = [...Array(tasks.length)].map((_, i) => [...Array(elapsedMinutes)].map((_, i) => 0));
+            taskAcceptedElapsedTimes.forEach((ar, index) => {
+                ar.forEach(seconds => {
+                    const minutes = Math.floor(seconds / 60);
+                    if (minutes >= elapsedMinutes) return;
+                    taskAcceptedCountImos[index][minutes] += 1
+                });
+            });
+            /** @type {number[][]} */
+            const taskAcceptedRatio = [...Array(tasks.length)].map((_, i) => []);
+            taskAcceptedCountImos.forEach((ar, index) => {
+                let cum = 0;
+                ar.forEach(imos => {
+                    cum += imos;
+                    taskAcceptedRatio[index].push(cum / participants);
+                })
+            });
+            // 差の自乗和が最小になるシーケンスを探す
+            return taskAcceptedRatio.map(ar => {
+                if (acRatioModel === undefined) return 0;
+                let minerror = 1.0 * elapsedMinutes;
+                let argmin = '';
+                let last_ratio = 0;
+                Object.keys(acRatioModel).forEach(key => {
+                    const ar2 = acRatioModel[key];
+                    let error = 0;
+                    for (let i = 0; i < elapsedMinutes; ++i) {
+                        error += Math.pow(ar[i] - ar2[i], 2);
+                    }
+                    if (error < minerror) {
+                        minerror = error;
+                        argmin = key;
+                        if (ar2[elapsedMinutes - 1] > 0) {
+                            last_ratio = ar2[ar2.length - 1] * (ar[elapsedMinutes - 1] / ar2[elapsedMinutes - 1]);
+                        } else {
+                            last_ratio = ar2[ar2.length - 1];
+                        }
+                    }
+                });
+                // console.log(argmin, minerror, last_ratio);
+                if (last_ratio > 1) last_ratio = 1;
+                return participants * last_ratio;
+            });
+        })();
+
         const dc = new DifficultyCalculator(innerRatings);
 
         const plotlyDifficultyChartId = 'acssa-mydiv-difficulty';
@@ -464,6 +545,7 @@
             </tbody>
             <tbody>
               <tr id="acssa-tbody-${tableIdx}" class="acssa-tbody"></tr>
+              ${(estimationIsEnabled) ? `<tr id="acssa-tbody-predicted-${tableIdx}" class="acssa-tbody"></tr>` : ''}
             </tbody>
           </table>
           `).join('')}
@@ -668,6 +750,13 @@
         logPlotCheckbox.addEventListener('change', onLogPlotCheckboxChanged);
 
         // 現在の Difficulty テーブルを構築する
+        if (estimationIsEnabled) {
+            for (let tableIdx = 0; tableIdx < Math.ceil(tasks.length / COL_PER_ROW); ++tableIdx) {
+                document.getElementById(`acssa-thead-${tableIdx}`).insertAdjacentHTML("beforeend", `<th></th>`);
+                document.getElementById(`acssa-tbody-${tableIdx}`).insertAdjacentHTML("beforeend", `<th>Current</td>`);
+                document.getElementById(`acssa-tbody-predicted-${tableIdx}`).insertAdjacentHTML("beforeend", `<th>Predicted</td>`);
+            }
+        }
         for (let j = 0; j < tasks.length; ++j) {
             const tableIdx = Math.floor(j / COL_PER_ROW);
             const correctedDifficulty = RatingConverter.toCorrectedRating(dc.binarySearch(taskAcceptedCounts[j]));
@@ -685,6 +774,18 @@
             if (correctedDifficulty !== 9999) {
                 document.getElementById(id).insertAdjacentHTML(
                     "afterbegin", generateDifficultyCircle(correctedDifficulty));
+            }
+            if (estimationIsEnabled) {
+                const correctedPredictedDifficulty = RatingConverter.toCorrectedRating(dc.binarySearch(acCountPredicted[j]));
+                const idPredicted = `td-assa-difficulty-predicted-${j}`;
+                document.getElementById(`acssa-tbody-predicted-${tableIdx}`).insertAdjacentHTML("beforeend", `
+                    <td ${tdClass} id="${idPredicted}" style="color:${getColor(correctedPredictedDifficulty)};">
+                    ${correctedPredictedDifficulty === 9999 ? '-' : correctedPredictedDifficulty}</td>
+                `);
+                if (correctedPredictedDifficulty !== 9999) {
+                    document.getElementById(idPredicted).insertAdjacentHTML(
+                        "afterbegin", generateDifficultyCircle(correctedPredictedDifficulty));
+                }
             }
         }
 
