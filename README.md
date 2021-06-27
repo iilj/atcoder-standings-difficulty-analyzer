@@ -5,7 +5,11 @@ atcoder-standings-difficulty-analyzer
 
 AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表示する userscript です．
 
-![Difficulty Chart Image](images/20210102-00.png "Difficulty Chart")
+![Difficulty Chart Image 00](images/20210102-00.png "Difficulty Chart 00")
+
+コンテスト中は，現時点の Difficulty と，最終的な Difficulty の推定値を表示します．
+
+![Difficulty Chart Image 01](images/20210627-00.png "Difficulty Chart 01")
 
 ## 機能
 
@@ -46,3 +50,5 @@ Tampermonkey 等で読み込んで使用してください．
 - 2021.4.30.1
   - Plot your result 有効時，Difficulty テーブル内の AC 済み問題の背景を緑で塗るように変更
     - これに伴い，チェックマーク（✓）の表示は廃止
+- 2021.6.27.0
+  - コンテスト中，現時点の Difficulty だけでなく，最終的な Difficulty の推定値も表示する機能を追加
