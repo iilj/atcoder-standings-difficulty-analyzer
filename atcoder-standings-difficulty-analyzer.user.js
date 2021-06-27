@@ -311,19 +311,19 @@
     let acRatioModel = undefined;
     if (moment() < endTime) {
         const contestDurationMinutes = (endTime - startTime) / 1000 / 60;
+        // https://raw.githubusercontent.com/iilj/atcoder-standings-difficulty-analyzer/main/json/standings/abc_100m.json
+        const baseUrl = 'https://raw.githubusercontent.com/iilj/atcoder-standings-difficulty-analyzer/main/json/standings';
         if (contestScreenName.match(/^agc(\d{3,})$/)) {
-            if (contestDurationMinutes == 150) {
-                modelLocation = 'https://gist.githubusercontent.com/iilj/1b4b6674a2e477e7a06fa4595ccfa9fe/raw/dd479d874fc22395fc6a701aa22a4abc10f2e4f3/standings_agc_150m.json';
+            if ([110, 120, 130, 140, 150, 160, 180, 200, 210, 240, 270, 300].includes(contestDurationMinutes)) {
+                modelLocation = `${baseUrl}/agc_${contestDurationMinutes}m.json`;
             }
         } else if (contestScreenName.match(/^arc(\d{3,})$/)) {
-            if (contestDurationMinutes == 120) {
-                modelLocation = 'https://gist.githubusercontent.com/iilj/8bfd3279ddc7d94e64239a2ae3e7ca4c/raw/0f3d11d12c5ba984dce4fb8d5487b3dcafa41189/standings_arc_120m.json';
-            } else if (contestDurationMinutes == 100) {
-                modelLocation = 'https://gist.githubusercontent.com/iilj/e580811a2c7a6e5c91dcf99704cbf6f4/raw/49938a5b6f8ca623a2e89f57410789e56d02149a/standings_arc_100m.json';
+            if ([100, 120, 150], includes(contestDurationMinutes)) {
+                modelLocation = `${baseUrl}/arc_${contestDurationMinutes}m.json`;
             }
         } else if (contestScreenName.match(/^abc(\d{3,})$/)) {
-            if (contestDurationMinutes == 100) {
-                modelLocation = 'https://gist.githubusercontent.com/iilj/9c4db3cc1034c4a62e7cdb3a63d5f4d5/raw/17a13ff322c176c35cd0626af05af15815047ddd/standings_abc_100m.json';
+            if ([100, 120].includes(contestDurationMinutes)) {
+                modelLocation = `${baseUrl}/arc_${contestDurationMinutes}m.json`;
             }
         }
         if (modelLocation !== undefined) {
@@ -505,6 +505,7 @@
             // 差の自乗和が最小になるシーケンスを探す
             return taskAcceptedRatio.map(ar => {
                 if (acRatioModel === undefined) return 0;
+                if (ar[elapsedMinutes - 1] === 0) return 0;
                 let minerror = 1.0 * elapsedMinutes;
                 let argmin = '';
                 let last_ratio = 0;
