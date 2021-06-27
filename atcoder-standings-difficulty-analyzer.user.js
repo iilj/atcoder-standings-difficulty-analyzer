@@ -323,7 +323,7 @@
             }
         } else if (contestScreenName.match(/^abc(\d{3,})$/)) {
             if ([100, 120].includes(contestDurationMinutes)) {
-                modelLocation = `${baseUrl}/arc_${contestDurationMinutes}m.json`;
+                modelLocation = `${baseUrl}/abc_${contestDurationMinutes}m.json`;
             }
         }
         if (modelLocation !== undefined) {
