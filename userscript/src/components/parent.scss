@@ -1,0 +1,66 @@
+#acssa-contents {
+    .table.acssa-table {
+        width: 100%;
+        table-layout: fixed;
+        margin-bottom: 1.5rem;
+        .acssa-thead {
+            font-weight: bold;
+        }
+        &>tbody>tr>td.success.acssa-task-success.acssa-task-success-suppress {
+            background-color: transparent;
+        }
+    }
+
+    #acssa-tab-wrapper {
+        display: none;
+        #acssa-chart-tab {
+            margin-bottom: 0.5rem;
+            display: inline-block;
+            a {
+                cursor: pointer;
+                span.glyphicon {
+                    margin-right: 0.5rem;
+                }
+            }
+        }
+
+        #acssa-checkbox-tab {
+            margin-bottom: 0.5rem;
+            display: inline-block;
+            li a {
+                color: black;
+                &:hover {
+                    background-color: transparent;
+                }
+                label {
+                    cursor: pointer;
+                    margin: 0;
+                    input {
+                        cursor: pointer;
+                        margin: 0;
+                    }
+                }
+            }
+            #acssa-checkbox-toggle-log-plot-parent {
+                display: none;
+            }
+        }
+    }
+
+    .acssa-loader-wrapper {
+        background-color: #337ab7;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-radius: 3px;
+    }
+
+    .acssa-chart-wrapper {
+        display: none;
+        &.acssa-chart-wrapper-active {
+            display: block;
+        }
+    }
+}

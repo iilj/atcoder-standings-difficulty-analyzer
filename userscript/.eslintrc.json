@@ -1,0 +1,46 @@
+{
+    "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended",
+        "plugin:@typescript-eslint/recommended-requiring-type-checking",
+        "plugin:prettier/recommended"
+    ],
+    "plugins": [
+        "@typescript-eslint"
+    ],
+    "env": {
+        "browser": true,
+        "es2017": true
+    },
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+        "sourceType": "module",
+        "project": "./tsconfig.json",
+        "ecmaVersion": 2017
+    },
+    "rules": {
+        // "indent": [
+        //     "error",
+        //     4,
+        //     {
+        //         "SwitchCase": 1,
+        //         "MemberExpression": 1
+        //     }
+        // ],
+        "@typescript-eslint/no-use-before-define": [
+            "error",
+            {
+                "functions": false,
+                "classes": false
+            }
+        ],
+        "prettier/prettier": [
+            "error",
+            {
+                "printWidth": 120,
+                "tabWidth": 4,
+                "singleQuote": true
+            }
+        ]
+    }
+}

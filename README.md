@@ -11,6 +11,7 @@ AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表
 
 ![Difficulty Chart Image 01](images/20210627-00.png "Difficulty Chart 01")
 
+
 ## 機能
 
 - 問題ごとの Difficulty 推定値の表示
@@ -20,13 +21,16 @@ AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表
   - 得点ごとの Last Accepted Time 統計
     - 元ネタ: [https://twitter.com/yuta_game_music/status/1299708740216582145](https://twitter.com/yuta_game_music/status/1299708740216582145)
 
+
 ## Greasy Fork 配布ページ
 
 - [atcoder\-standings\-difficulty\-analyzer](https://greasyfork.org/ja/scripts/419541-atcoder-standings-difficulty-analyzer)
 
+
 ## 使用方法
 
 Tampermonkey 等で読み込んで使用してください．
+
 
 ## 更新履歴
 
@@ -52,3 +56,5 @@ Tampermonkey 等で読み込んで使用してください．
     - これに伴い，チェックマーク（✓）の表示は廃止
 - 2021.6.27.0
   - コンテスト中，現時点の Difficulty だけでなく，最終的な Difficulty の推定値も表示する機能を追加
+- 2021.8.0
+  - 開発環境を TypeScript へ移行

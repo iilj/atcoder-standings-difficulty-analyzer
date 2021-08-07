@@ -1,0 +1,46 @@
+{
+  "name": "atcoder-standings-difficulty-analyzer",
+  "version": "2021.8.0",
+  "description": "順位表の得点情報を集計し，推定 difficulty やその推移を表示します．",
+  "typeRoots": [
+    "types",
+    "node_modules/@types"
+  ],
+  "scripts": {
+    "lint": "tsc --noEmit; eslint 'src/**/*.ts'",
+    "lint:fix": "tsc --noEmit; eslint --fix 'src/**/*.ts'",
+    "bundle": "rollup -c",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iilj/atcoder-standings-difficulty-analyzer.git"
+  },
+  "author": "iilj",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/iilj/atcoder-standings-difficulty-analyzer/issues"
+  },
+  "homepage": "https://github.com/iilj/atcoder-standings-difficulty-analyzer#readme",
+  "devDependencies": {
+    "@types/jest": "^26.0.24",
+    "@types/moment": "^2.13.0",
+    "@types/plotly.js": "^1.54.13",
+    "@types/tampermonkey": "^4.0.2",
+    "@types/vue": "^2.0.0",
+    "@typescript-eslint/eslint-plugin": "^4.28.5",
+    "@typescript-eslint/parser": "^4.28.5",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^3.4.0",
+    "jest": "^27.0.6",
+    "prettier": "^2.3.2",
+    "rollup": "^2.55.1",
+    "rollup-plugin-html": "^0.2.1",
+    "rollup-plugin-scss": "^3.0.0",
+    "rollup-plugin-typescript": "^1.0.1",
+    "sass": "^1.37.5",
+    "ts-jest": "^27.0.4",
+    "typescript": "^4.3.5"
+  }
+}
