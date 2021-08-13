@@ -1,5 +1,6 @@
 import moment = require('moment');
 import css from './parent.scss';
+import teamalert from './team_standings_alert.html';
 import { ElapsedSeconds, Rating, Score, StandingsEntry, TaskInfoEntry, VueStandings } from '../interfaces/Standings';
 import { getCenterOfInnerRating, rangeLen } from '../utils';
 import {
@@ -53,6 +54,9 @@ export class Parent {
     /** 参加者の内部レートリストを基にして difficulty を推定する */
     dc!: DifficultyCalculator;
 
+    /** このコンテストがチーム戦かどうか */
+    hasTeamStandings: boolean;
+
     constructor(acRatioModel: ContestAcRatioModel) {
         const loaderStyles = GM_getResourceText('loaders.min.css');
         GM_addStyle(loaderStyles + '\n' + css);
@@ -61,6 +65,7 @@ export class Parent {
         this.acRatioModel = acRatioModel;
         this.working = false;
         this.oldStandingsData = null;
+        this.hasTeamStandings = this.searchTeamStandingsPage();
     }
 
     public static init = async (): Promise<Parent> => {
@@ -72,6 +77,13 @@ export class Parent {
             return new Parent(undefined);
         }
     };
+
+    searchTeamStandingsPage(): boolean {
+        const teamStandingsLink: HTMLAnchorElement | null = document.querySelector(
+            `a[href*="/contests/${contestScreenName}/standings/team"]`
+        );
+        return teamStandingsLink !== null;
+    }
 
     async onStandingsChanged(standings: VueStandings): Promise<void> {
         if (!standings) return;
@@ -101,6 +113,13 @@ export class Parent {
         const acssaContentDiv: HTMLDivElement = document.createElement('div');
         acssaContentDiv.id = CONTENT_DIV_ID;
         standingsElement.insertAdjacentElement('afterbegin', acssaContentDiv);
+
+        if (this.hasTeamStandings) {
+            if (!location.href.includes('/standings/team')) {
+                // チーム戦順位表へ誘導
+                acssaContentDiv.insertAdjacentHTML('afterbegin', teamalert);
+            }
+        }
 
         // difficulty
         new DifficyltyTable(
@@ -164,7 +183,8 @@ export class Parent {
 
             if (!standingsEntry.TaskResults) continue; // 参加登録していない
             if (standingsEntry.UserIsDeleted) continue; // アカウント削除
-            let correctedRating = this.isDuringContest ? standingsEntry.Rating : standingsEntry.OldRating;
+            // let correctedRating = this.isDuringContest ? standingsEntry.Rating : standingsEntry.OldRating;
+            let correctedRating = standingsEntry.Rating;
             const isTeamOrBeginner = correctedRating === 0;
             if (isTeamOrBeginner) {
                 // continue; // 初参加 or チーム
@@ -203,6 +223,7 @@ export class Parent {
                       Math.max(RatingConverter.toRealRating(correctedRating), 1),
                       standingsEntry.Competitions
                   );
+            // console.log(this.isDuringContest, standingsEntry.Rating, standingsEntry.OldRating, innerRating);
             if (innerRating) this.innerRatings.push(innerRating);
             else {
                 console.log(i, innerRating, correctedRating, standingsEntry.Competitions);
