@@ -141,7 +141,7 @@ export class Charts {
             difficultyChartData.push({
                 x: taskAcceptedElapsedTimesForChart,
                 y: taskAcceptedCountsForChart.map((taskAcceptedCountForChart) =>
-                    this.dc.binarySearch(taskAcceptedCountForChart)
+                    this.dc.binarySearchCorrectedDifficulty(taskAcceptedCountForChart)
                 ),
                 type: 'scatter',
                 name: `${this.tasks[j].Assignment}`,
@@ -166,7 +166,7 @@ export class Charts {
                     const yourAcceptedCount =
                         arrayLowerBound(this.taskAcceptedElapsedTimes[j], this.yourTaskAcceptedElapsedTimes[j]) + 1;
                     yourAcceptedCounts.push(yourAcceptedCount);
-                    yourAcceptedDifficulties.push(this.dc.binarySearch(yourAcceptedCount));
+                    yourAcceptedDifficulties.push(this.dc.binarySearchCorrectedDifficulty(yourAcceptedCount));
                 }
             }
 
@@ -267,8 +267,10 @@ export class Charts {
     /** Difficulty Chart 描画 */
     async plotDifficultyChartData(difficultyChartData: Partial<Plotly.ScatterData>[]): Promise<void> {
         const maxAcceptedCount = this.taskAcceptedCounts.reduce((a, b) => Math.max(a, b));
-        const yMax = RatingConverter.toCorrectedRating(this.dc.binarySearch(1));
-        const yMin = RatingConverter.toCorrectedRating(this.dc.binarySearch(Math.max(2, maxAcceptedCount)));
+        const yMax = RatingConverter.toCorrectedRating(this.dc.binarySearchCorrectedDifficulty(1));
+        const yMin = RatingConverter.toCorrectedRating(
+            this.dc.binarySearchCorrectedDifficulty(Math.max(2, maxAcceptedCount))
+        );
 
         // 描画
         const layout: Partial<Plotly.Layout> = {

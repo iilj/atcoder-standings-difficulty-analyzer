@@ -60,4 +60,7 @@ Tampermonkey 等で読み込んで使用してください．
   - 開発環境を TypeScript へ移行
 - 2021.8.1
   - 有志コンの difficulty 推定が正しく動いていなかった問題を修正
+    - [NatsubiSoganさんはTwitterを使っています 「Difficulty を推定するスクリプト、有志コンで壊れてない？」 / Twitter](https://twitter.com/NatsubiSogan/status/1426089763887480836)
   - チーム順位表が提供されているコンテストで個人単位の順位表を開いている場合，より difficulty 推定値が正しいチーム順位表へ誘導するためのアラートを追加
+- 2021.9.0
+  - テーブルに表示される difficulty 400 未満の推定値が誤っていた問題を修正（グラフは以前から正しい）

@@ -1,7 +1,6 @@
 import { TaskInfoEntry } from '../interfaces/Standings';
 import { getColor, rangeLen } from '../utils';
 import { DifficultyCalculator } from '../utils/DifficultyCalculator';
-import { RatingConverter } from '../utils/RatingConverter';
 import { generateDifficultyCircle } from './DifficultyCircle';
 
 const COL_PER_ROW = 20;
@@ -63,7 +62,7 @@ export class DifficyltyTable {
         // build
         for (let j = 0; j < tasks.length; ++j) {
             const tableIdx = Math.floor(j / COL_PER_ROW);
-            const correctedDifficulty = RatingConverter.toCorrectedRating(dc.binarySearch(taskAcceptedCounts[j]));
+            const correctedDifficulty = dc.binarySearchCorrectedDifficulty(taskAcceptedCounts[j]);
             const tdClass = yourTaskAcceptedElapsedTimes[j] === -1 ? '' : 'class="success acssa-task-success"';
             (document.getElementById(`acssa-thead-${tableIdx}`) as HTMLElement).insertAdjacentHTML(
                 'beforeend',
@@ -88,9 +87,7 @@ export class DifficyltyTable {
                 );
             }
             if (isEstimationEnabled) {
-                const correctedPredictedDifficulty = RatingConverter.toCorrectedRating(
-                    dc.binarySearch(acCountPredicted[j])
-                );
+                const correctedPredictedDifficulty = dc.binarySearchCorrectedDifficulty(acCountPredicted[j]);
                 const idPredicted = `td-assa-difficulty-predicted-${j}`;
                 (document.getElementById(`acssa-tbody-predicted-${tableIdx}`) as HTMLElement).insertAdjacentHTML(
                     'beforeend',
