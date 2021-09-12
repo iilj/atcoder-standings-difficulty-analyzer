@@ -34,7 +34,7 @@ export class DifficultyCalculator {
     }
 
     /** Difficulty 推定値を算出する */
-    binarySearch(acceptedCount: number): Difficulty {
+    binarySearchCorrectedDifficulty(acceptedCount: number): Difficulty {
         if (this.memo.has(acceptedCount)) {
             return this.memo.get(acceptedCount) as Difficulty;
         }
