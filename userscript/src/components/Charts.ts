@@ -94,9 +94,9 @@ export class Charts {
         this.taskAcceptedElapsedTimes.forEach((ar) => {
             ar.sort((a, b) => a - b);
         });
-
         // 時系列データの準備
-        const [difficultyChartData, acceptedCountChartData] = this.getTimeSeriesChartData();
+        const [difficultyChartData, acceptedCountChartData] = await this.getTimeSeriesChartData();
+
 
         // 得点と提出時間データの準備
         const [lastAcceptedTimeChartData, maxAcceptedTime] = this.getLastAcceptedTimeChartData();
@@ -115,11 +115,12 @@ export class Charts {
     }
 
     /** 時系列データの準備 */
-    getTimeSeriesChartData(): [Partial<Plotly.ScatterData>[], Partial<Plotly.ScatterData>[]] {
+    async getTimeSeriesChartData(): Promise<[Partial<Plotly.ScatterData>[], Partial<Plotly.ScatterData>[]]> {
         /** Difficulty Chart のデータ */
         const difficultyChartData: Partial<Plotly.ScatterData>[] = [];
         /** AC Count Chart のデータ */
         const acceptedCountChartData: Partial<Plotly.ScatterData>[] = [];
+        const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
         for (let j = 0; j < this.tasks.length; ++j) {
             //
@@ -138,11 +139,24 @@ export class Charts {
                 [[] as ElapsedSeconds[], [] as number[]]
             );
 
+            let correctedDifficulties: number[] = [];
+            let counter = 0;
+            for (const taskAcceptedCountForChart of taskAcceptedCountsForChart) {
+              correctedDifficulties.push(
+                this.dc.binarySearchCorrectedDifficulty(
+                  taskAcceptedCountForChart
+                )
+              );
+              counter += 1;
+              // 20回に1回setTimeout(0)でeventループに処理を移す
+              if (counter % 20 == 0) {
+                await sleep(0);
+              }
+            }
+
             difficultyChartData.push({
                 x: taskAcceptedElapsedTimesForChart,
-                y: taskAcceptedCountsForChart.map((taskAcceptedCountForChart) =>
-                    this.dc.binarySearchCorrectedDifficulty(taskAcceptedCountForChart)
-                ),
+                y: correctedDifficulties,
                 type: 'scatter',
                 name: `${this.tasks[j].Assignment}`,
             });
