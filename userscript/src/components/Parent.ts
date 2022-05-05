@@ -149,13 +149,11 @@ export class Parent {
         );
 
         // 順位表のその他の描画を優先するために，プロットは後回しにする
-        window.setTimeout((): void => {
-            void charts.plotAsync().then(() => {
-                charts.hideLoader();
-                tabs.showTabsControl();
-                this.working = false;
-            });
-        }, 100);
+        charts.plotAsync().then(() => {
+            charts.hideLoader();
+            tabs.showTabsControl();
+            this.working = false;
+        });
     }
 
     removeOldContents(): void {
