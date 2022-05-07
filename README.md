@@ -1,6 +1,8 @@
 atcoder-standings-difficulty-analyzer
 =====
 
+[![Lint](https://github.com/iilj/atcoder-standings-difficulty-analyzer/actions/workflows/main.yml/badge.svg)](https://github.com/iilj/atcoder-standings-difficulty-analyzer/actions/workflows/main.yml)
+
 ## 概要
 
 AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表示する userscript です．
