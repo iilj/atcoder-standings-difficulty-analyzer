@@ -63,6 +63,67 @@ export const getCenterOfInnerRating = (contestScreenName: string): number => {
     return 800;
 };
 
+export const getCenterOfInnerRatingFromRange = (contestRatedRange: [number, number]): number => {
+    if (contestScreenName.startsWith('abc')) {
+        return 800;
+    }
+    if (contestScreenName.startsWith('arc')) {
+        const contestNumber = Number(contestScreenName.substring(3, 6));
+        return contestNumber >= 104 ? 1000 : 1600;
+    }
+    if (contestScreenName.startsWith('agc')) {
+        const contestNumber = Number(contestScreenName.substring(3, 6));
+        return contestNumber >= 34 ? 1200 : 1600;
+    }
+
+    if (contestRatedRange[1] === 1999) {
+        return 800;
+    } else if (contestRatedRange[1] === 2799) {
+        return 1000;
+    } else if (contestRatedRange[1] === Infinity) {
+        return 1200;
+    }
+    return 800;
+};
+
+// ContestRatedRange
+
+/*
+function getContestInformationAsync(contestScreenName) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const html = yield fetchTextDataAsync(`https://atcoder.jp/contests/${contestScreenName}`);
+        const topPageDom = new DOMParser().parseFromString(html, "text/html");
+        const dataParagraph = topPageDom.getElementsByClassName("small")[0];
+        const data = Array.from(dataParagraph.children).map((x) => x.innerHTML.split(":")[1].trim());
+        return new ContestInformation(parseRangeString(data[0]), parseRangeString(data[1]), parseDurationString(data[2]));
+    });
+}
+*/
+
+function parseRangeString(s: string): [number, number] {
+    s = s.trim();
+    if (s === '-') return [0, -1];
+    if (s === 'All') return [0, Infinity];
+    if (!/[-~]/.test(s)) return [0, -1];
+    const res = s.split(/[-~]/).map((x) => parseInt(x.trim())) as [number, number];
+    if (res.length !== 2) {
+        throw new Error('res is not [number, number]');
+    }
+    if (isNaN(res[0])) res[0] = 0;
+    if (isNaN(res[1])) res[1] = Infinity;
+    return res;
+}
+
+export const getContestRatedRangeAsync = async (contestScreenName: string): Promise<[number, number]> => {
+    const html = await fetch(`https://atcoder.jp/contests/${contestScreenName}`);
+    const topPageDom = new DOMParser().parseFromString(await html.text(), 'text/html');
+    const dataParagraph = topPageDom.getElementsByClassName('small')[0];
+    const data = Array.from(dataParagraph.children).map((x) => x.innerHTML.split(':')[1].trim());
+    // console.log("data", data);
+    return parseRangeString(data[1]);
+    // return new ContestInformation(parseRangeString(data[0]), parseRangeString(data[1]), parseDurationString(data[2]));
+};
+
 /**
  * returns array [start, start+1, ..., end].
  *

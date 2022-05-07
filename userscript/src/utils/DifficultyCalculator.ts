@@ -33,6 +33,17 @@ export class DifficultyCalculator {
         return this.perf2ExpectedAcceptedCount(x) + 0.5;
     }
 
+    rank2InnerPerf(rank: number): Performance {
+        let upper: Performance = 9999;
+        let lower: Performance = -9999;
+        while (upper - lower > 0.1) {
+            const mid: Performance = (upper + lower) / 2;
+            if (rank > this.perf2Ranking(mid)) upper = mid;
+            else lower = mid;
+        }
+        return Math.round((upper + lower) / 2);
+    }
+
     /** Difficulty 推定値を算出する */
     binarySearchCorrectedDifficulty(acceptedCount: number): Difficulty {
         if (this.memo.has(acceptedCount)) {

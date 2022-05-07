@@ -5,6 +5,7 @@ import { arrayLowerBound, formatTimespan, getContestDurationSec } from '../utils
 import { DifficultyCalculator } from '../utils/DifficultyCalculator';
 import { RatingConverter } from '../utils/RatingConverter';
 import { Tabs } from './Tabs';
+import { DEBUG, DEBUG_USERNAME } from './debug';
 
 const LOADER_ID = 'acssa-loader' as const;
 export const plotlyDifficultyChartId = 'acssa-mydiv-difficulty' as const;
@@ -97,7 +98,6 @@ export class Charts {
         // 時系列データの準備
         const [difficultyChartData, acceptedCountChartData] = await this.getTimeSeriesChartData();
 
-
         // 得点と提出時間データの準備
         const [lastAcceptedTimeChartData, maxAcceptedTime] = this.getLastAcceptedTimeChartData();
 
@@ -120,7 +120,7 @@ export class Charts {
         const difficultyChartData: Partial<Plotly.ScatterData>[] = [];
         /** AC Count Chart のデータ */
         const acceptedCountChartData: Partial<Plotly.ScatterData>[] = [];
-        const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+        const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
         for (let j = 0; j < this.tasks.length; ++j) {
             //
@@ -139,19 +139,15 @@ export class Charts {
                 [[] as ElapsedSeconds[], [] as number[]]
             );
 
-            let correctedDifficulties: number[] = [];
+            const correctedDifficulties: number[] = [];
             let counter = 0;
             for (const taskAcceptedCountForChart of taskAcceptedCountsForChart) {
-              correctedDifficulties.push(
-                this.dc.binarySearchCorrectedDifficulty(
-                  taskAcceptedCountForChart
-                )
-              );
-              counter += 1;
-              // 20回に1回setTimeout(0)でeventループに処理を移す
-              if (counter % 20 == 0) {
-                await sleep(0);
-              }
+                correctedDifficulties.push(this.dc.binarySearchCorrectedDifficulty(taskAcceptedCountForChart));
+                counter += 1;
+                // 20回に1回setTimeout(0)でeventループに処理を移す
+                if (counter % 20 == 0) {
+                    await sleep(0);
+                }
             }
 
             difficultyChartData.push({
@@ -189,7 +185,7 @@ export class Charts {
                 y: yourAcceptedDifficulties,
                 mode: 'markers',
                 type: 'scatter',
-                name: `${userScreenName}`,
+                name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                 marker: yourMarker,
             };
             this.tabs.yourAcceptedCountChartData = {
@@ -197,7 +193,7 @@ export class Charts {
                 y: yourAcceptedCounts,
                 mode: 'markers',
                 type: 'scatter',
-                name: `${userScreenName}`,
+                name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                 marker: yourMarker,
             };
             difficultyChartData.push(this.tabs.yourDifficultyChartData);
@@ -241,7 +237,7 @@ export class Charts {
                     y: [this.yourLastAcceptedTime],
                     mode: 'markers',
                     type: 'scatter',
-                    name: `${userScreenName}`,
+                    name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                     marker: yourMarker,
                 };
                 this.tabs.yourLastAcceptedTimeChartDataIndex = lastAcceptedTimeChartData.length + 0;
