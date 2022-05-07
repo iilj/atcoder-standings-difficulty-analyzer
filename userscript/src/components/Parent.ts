@@ -181,12 +181,17 @@ export class Parent {
             tabs
         );
 
-        // 順位表のその他の描画を優先するために，プロットは後回しにする
-        void charts.plotAsync().then(() => {
+        if (tabs.onloadPlot) {
+            // 順位表のその他の描画を優先するために，プロットは後回しにする
+            void charts.plotAsync().then(() => {
+                charts.hideLoader();
+                tabs.showTabsControl();
+                this.working = false;
+            });
+        } else {
             charts.hideLoader();
             tabs.showTabsControl();
-            this.working = false;
-        });
+        }
     }
 
     removeOldContents(): void {
