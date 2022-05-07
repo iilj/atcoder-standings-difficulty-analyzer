@@ -5,6 +5,7 @@ import { arrayLowerBound, formatTimespan, getContestDurationSec } from '../utils
 import { DifficultyCalculator } from '../utils/DifficultyCalculator';
 import { RatingConverter } from '../utils/RatingConverter';
 import { Tabs } from './Tabs';
+import { DEBUG, DEBUG_USERNAME } from './debug';
 
 const LOADER_ID = 'acssa-loader' as const;
 export const plotlyDifficultyChartId = 'acssa-mydiv-difficulty' as const;
@@ -50,7 +51,8 @@ export class Charts {
     yourLastAcceptedTime: ElapsedSeconds;
     participants: number;
 
-    dc: DifficultyCalculator;
+    dcForDifficulty: DifficultyCalculator;
+    dcForPerformance: DifficultyCalculator;
     tabs: Tabs;
 
     duration: number;
@@ -66,7 +68,8 @@ export class Charts {
         yourScore: Score,
         yourLastAcceptedTime: ElapsedSeconds,
         participants: number,
-        dc: DifficultyCalculator,
+        dcForDifficulty: DifficultyCalculator,
+        dcForPerformance: DifficultyCalculator,
         tabs: Tabs
     ) {
         this.tasks = tasks;
@@ -79,7 +82,8 @@ export class Charts {
         this.yourLastAcceptedTime = yourLastAcceptedTime;
         this.participants = participants;
 
-        this.dc = dc;
+        this.dcForDifficulty = dcForDifficulty;
+        this.dcForPerformance = dcForPerformance;
         this.tabs = tabs;
 
         parent.insertAdjacentHTML('beforeend', html);
@@ -96,7 +100,6 @@ export class Charts {
         });
         // 時系列データの準備
         const [difficultyChartData, acceptedCountChartData] = await this.getTimeSeriesChartData();
-
 
         // 得点と提出時間データの準備
         const [lastAcceptedTimeChartData, maxAcceptedTime] = this.getLastAcceptedTimeChartData();
@@ -120,7 +123,7 @@ export class Charts {
         const difficultyChartData: Partial<Plotly.ScatterData>[] = [];
         /** AC Count Chart のデータ */
         const acceptedCountChartData: Partial<Plotly.ScatterData>[] = [];
-        const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+        const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
         for (let j = 0; j < this.tasks.length; ++j) {
             //
@@ -139,19 +142,17 @@ export class Charts {
                 [[] as ElapsedSeconds[], [] as number[]]
             );
 
-            let correctedDifficulties: number[] = [];
+            const correctedDifficulties: number[] = [];
             let counter = 0;
             for (const taskAcceptedCountForChart of taskAcceptedCountsForChart) {
-              correctedDifficulties.push(
-                this.dc.binarySearchCorrectedDifficulty(
-                  taskAcceptedCountForChart
-                )
-              );
-              counter += 1;
-              // 20回に1回setTimeout(0)でeventループに処理を移す
-              if (counter % 20 == 0) {
-                await sleep(0);
-              }
+                correctedDifficulties.push(
+                    this.dcForDifficulty.binarySearchCorrectedDifficulty(taskAcceptedCountForChart)
+                );
+                counter += 1;
+                // 20回に1回setTimeout(0)でeventループに処理を移す
+                if (counter % 20 == 0) {
+                    await sleep(0);
+                }
             }
 
             difficultyChartData.push({
@@ -180,7 +181,9 @@ export class Charts {
                     const yourAcceptedCount =
                         arrayLowerBound(this.taskAcceptedElapsedTimes[j], this.yourTaskAcceptedElapsedTimes[j]) + 1;
                     yourAcceptedCounts.push(yourAcceptedCount);
-                    yourAcceptedDifficulties.push(this.dc.binarySearchCorrectedDifficulty(yourAcceptedCount));
+                    yourAcceptedDifficulties.push(
+                        this.dcForDifficulty.binarySearchCorrectedDifficulty(yourAcceptedCount)
+                    );
                 }
             }
 
@@ -189,7 +192,7 @@ export class Charts {
                 y: yourAcceptedDifficulties,
                 mode: 'markers',
                 type: 'scatter',
-                name: `${userScreenName}`,
+                name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                 marker: yourMarker,
             };
             this.tabs.yourAcceptedCountChartData = {
@@ -197,7 +200,7 @@ export class Charts {
                 y: yourAcceptedCounts,
                 mode: 'markers',
                 type: 'scatter',
-                name: `${userScreenName}`,
+                name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                 marker: yourMarker,
             };
             difficultyChartData.push(this.tabs.yourDifficultyChartData);
@@ -241,7 +244,7 @@ export class Charts {
                     y: [this.yourLastAcceptedTime],
                     mode: 'markers',
                     type: 'scatter',
-                    name: `${userScreenName}`,
+                    name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                     marker: yourMarker,
                 };
                 this.tabs.yourLastAcceptedTimeChartDataIndex = lastAcceptedTimeChartData.length + 0;
@@ -281,9 +284,9 @@ export class Charts {
     /** Difficulty Chart 描画 */
     async plotDifficultyChartData(difficultyChartData: Partial<Plotly.ScatterData>[]): Promise<void> {
         const maxAcceptedCount = this.taskAcceptedCounts.reduce((a, b) => Math.max(a, b));
-        const yMax = RatingConverter.toCorrectedRating(this.dc.binarySearchCorrectedDifficulty(1));
+        const yMax = RatingConverter.toCorrectedRating(this.dcForDifficulty.binarySearchCorrectedDifficulty(1));
         const yMin = RatingConverter.toCorrectedRating(
-            this.dc.binarySearchCorrectedDifficulty(Math.max(2, maxAcceptedCount))
+            this.dcForDifficulty.binarySearchCorrectedDifficulty(Math.max(2, maxAcceptedCount))
         );
 
         // 描画
@@ -337,9 +340,10 @@ export class Charts {
     async plotAcceptedCountChartData(acceptedCountChartData: Partial<Plotly.ScatterData>[]): Promise<void> {
         this.tabs.acceptedCountYMax = this.participants;
         const rectSpans: [number, number, string][] = colors.reduce((ar, cur) => {
-            const bottom = this.dc.perf2ExpectedAcceptedCount(cur[1]);
+            const bottom = this.dcForDifficulty.perf2ExpectedAcceptedCount(cur[1]);
             if (bottom > this.tabs.acceptedCountYMax) return ar;
-            const top = cur[0] == 0 ? this.tabs.acceptedCountYMax : this.dc.perf2ExpectedAcceptedCount(cur[0]);
+            const top =
+                cur[0] == 0 ? this.tabs.acceptedCountYMax : this.dcForDifficulty.perf2ExpectedAcceptedCount(cur[0]);
             if (top < 0.5) return ar;
             ar.push([Math.max(0.5, bottom), Math.min(this.tabs.acceptedCountYMax, top), cur[2]]);
             return ar;
@@ -401,9 +405,9 @@ export class Charts {
         const xMax = this.participants;
         const yMax = Math.ceil((maxAcceptedTime + this.xtick / 2) / this.xtick) * this.xtick;
         const rectSpans: [number, number, string][] = colors.reduce((ar, cur) => {
-            const right = cur[0] == 0 ? xMax : this.dc.perf2Ranking(cur[0]);
+            const right = cur[0] == 0 ? xMax : this.dcForPerformance.perf2Ranking(cur[0]);
             if (right < 1) return ar;
-            const left = this.dc.perf2Ranking(cur[1]);
+            const left = this.dcForPerformance.perf2Ranking(cur[1]);
             if (left > xMax) return ar;
             ar.push([Math.max(0, left), Math.min(xMax, right), cur[2]]);
             return ar;

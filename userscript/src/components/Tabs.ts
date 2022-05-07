@@ -6,7 +6,10 @@ const TABS_WRAPPER_ID = 'acssa-tab-wrapper' as const;
 const CHART_TAB_ID = 'acssa-chart-tab' as const;
 const CHART_TAB_BUTTON_CLASS = 'acssa-chart-tab-button' as const;
 const CHECKBOX_TOGGLE_YOUR_RESULT_VISIBILITY = 'acssa-checkbox-toggle-your-result-visibility' as const;
+const PARENT_CHECKBOX_TOGGLE_YOUR_RESULT_VISIBILITY = `${CHECKBOX_TOGGLE_YOUR_RESULT_VISIBILITY}-parent` as const;
 const CHECKBOX_TOGGLE_LOG_PLOT = 'acssa-checkbox-toggle-log-plot' as const;
+const CHECKBOX_TOGGLE_ONLOAD_PLOT = 'acssa-checkbox-toggle-onload-plot' as const;
+const CONFIG_CNLOAD_PLOT_KEY = 'acssa-config-onload-plot' as const;
 const PARENT_CHECKBOX_TOGGLE_LOG_PLOT = `${CHECKBOX_TOGGLE_LOG_PLOT}-parent` as const;
 
 export class Tabs {
@@ -17,6 +20,7 @@ export class Tabs {
     showYourResultCheckbox: HTMLInputElement;
     logPlotCheckbox: HTMLInputElement;
     logPlotCheckboxParent: HTMLLIElement;
+    onloadPlotCheckbox: HTMLInputElement;
 
     acceptedCountYMax: number;
     yourDifficultyChartData: Partial<Plotly.PlotData> | null;
@@ -26,6 +30,8 @@ export class Tabs {
 
     yourScore: number;
     participants: number;
+
+    onloadPlot: boolean;
 
     constructor(parent: HTMLDivElement, yourScore: number, participants: number) {
         this.yourScore = yourScore;
@@ -39,6 +45,9 @@ export class Tabs {
         ) as HTMLInputElement;
         this.logPlotCheckbox = document.getElementById(CHECKBOX_TOGGLE_LOG_PLOT) as HTMLInputElement;
         this.logPlotCheckboxParent = document.getElementById(PARENT_CHECKBOX_TOGGLE_LOG_PLOT) as HTMLLIElement;
+        this.onloadPlotCheckbox = document.getElementById(CHECKBOX_TOGGLE_ONLOAD_PLOT) as HTMLInputElement;
+        this.onloadPlot = JSON.parse(localStorage.getItem(CONFIG_CNLOAD_PLOT_KEY) ?? 'true') as boolean;
+        this.onloadPlotCheckbox.checked = this.onloadPlot;
 
         // チェックボックス操作時のイベントを登録する */
         this.showYourResultCheckbox.addEventListener('change', () => {
@@ -57,6 +66,10 @@ export class Tabs {
         });
         this.logPlotCheckbox.addEventListener('change', (): void => {
             void this.onLogPlotCheckboxChangedAsync();
+        });
+        this.onloadPlotCheckbox.addEventListener('change', (): void => {
+            this.onloadPlot = this.onloadPlotCheckbox.checked;
+            localStorage.setItem(CONFIG_CNLOAD_PLOT_KEY, JSON.stringify(this.onloadPlot));
         });
 
         this.activeTab = 0;
@@ -232,5 +245,10 @@ export class Tabs {
 
     showTabsControl(): void {
         (document.getElementById(TABS_WRAPPER_ID) as HTMLElement).style.display = 'block';
+        if (!this.onloadPlot) {
+            (document.getElementById(CHART_TAB_ID) as HTMLUListElement).style.display = 'none';
+            (document.getElementById(PARENT_CHECKBOX_TOGGLE_YOUR_RESULT_VISIBILITY) as HTMLLIElement).style.display =
+                'none';
+        }
     }
 }

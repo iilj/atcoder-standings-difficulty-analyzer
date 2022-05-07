@@ -1,6 +1,6 @@
 {
   "name": "atcoder-standings-difficulty-analyzer",
-  "version": "2022.5.0",
+  "version": "2022.5.1",
   "description": "順位表の得点情報を集計し，推定 difficulty やその推移を表示します．",
   "typeRoots": [
     "types",
@@ -27,7 +27,6 @@
     "@types/moment": "^2.13.0",
     "@types/plotly.js": "^1.54.13",
     "@types/tampermonkey": "^4.0.2",
-    "@types/vue": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^4.28.5",
     "@typescript-eslint/parser": "^4.28.5",
     "eslint": "^7.32.0",
@@ -41,6 +40,7 @@
     "rollup-plugin-typescript": "^1.0.1",
     "sass": "^1.37.5",
     "ts-jest": "^27.0.4",
-    "typescript": "^4.3.5"
+    "typescript": "^4.3.5",
+    "vue": "2.6.11"
   }
 }

@@ -19,6 +19,7 @@ export class DifficyltyTable {
         parent.insertAdjacentHTML(
             'beforeend',
             `
+            <p><span class="h2">Difficulty</span></p>
             <div id="acssa-table-wrapper">
                 ${rangeLen(Math.ceil(tasks.length / COL_PER_ROW))
                     .map(

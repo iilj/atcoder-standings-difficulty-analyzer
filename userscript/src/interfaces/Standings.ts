@@ -51,7 +51,7 @@ export interface StandingsEntry {
     readonly Country: string;
     /** 表示名．"hitonanode" など． */
     readonly DisplayName: string;
-    /** コンテスト順位？ */
+    /** コンテスト順位 */
     readonly EntireRank: number;
     /** Rated かどうか */
     readonly IsRated: boolean;
@@ -59,7 +59,7 @@ export interface StandingsEntry {
     readonly IsTeam: boolean;
     /** コンテスト前のレーティング．コンテスト後のみ有効． */
     readonly OldRating: Rating;
-    /** コンテスト順位？ */
+    /** フィルタ済みユーザ内の順位 */
     readonly Rank: number;
     /** コンテスト後のレーティング */
     readonly Rating: Rating;

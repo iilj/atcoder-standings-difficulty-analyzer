@@ -1,6 +1,8 @@
 atcoder-standings-difficulty-analyzer
 =====
 
+[![Lint](https://github.com/iilj/atcoder-standings-difficulty-analyzer/actions/workflows/main.yml/badge.svg)](https://github.com/iilj/atcoder-standings-difficulty-analyzer/actions/workflows/main.yml)
+
 ## 概要
 
 AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表示する userscript です．
@@ -64,3 +66,9 @@ Tampermonkey 等で読み込んで使用してください．
   - チーム順位表が提供されているコンテストで個人単位の順位表を開いている場合，より difficulty 推定値が正しいチーム順位表へ誘導するためのアラートを追加
 - 2021.9.0
   - テーブルに表示される difficulty 400 未満の推定値が誤っていた問題を修正（グラフは以前から正しい）
+- 2022.5.0
+  - 処理の重い部分に定期的に event loop に処理を譲る処理を追加 (https://github.com/flours さん)
+- 2022.5.1
+  - Performance テーブルを追加 (#6)
+  - チャートを表示しないオプション用チェックボックス（Onload plot）を追加 (#5)
+  - LastAcceptedTime チャートの背景色の Difficulty 境界がズレていた問題を修正 (#4)
