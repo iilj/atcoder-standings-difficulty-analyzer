@@ -10,7 +10,7 @@ import {
     InnerRatingsFromPredictor,
 } from '../utils/data';
 import { DifficultyCalculator } from '../utils/DifficultyCalculator';
-import { RatingConverter } from '../utils/RatingConverter';
+// import { RatingConverter } from '../utils/RatingConverter';
 import { Charts } from './Charts';
 import { DifficyltyTable } from './DifficultyTable';
 import { Tabs } from './Tabs';
@@ -41,8 +41,10 @@ export class Parent {
     taskAcceptedCounts!: number[];
     /** 各問題の正答時間リスト．秒単位で格納する． */
     taskAcceptedElapsedTimes!: ElapsedSeconds[][];
-    /** 内部レートのリスト． */
+    /** 内部レートのリスト，Difficulty 計算用に Unrated な参加者も含む． */
     innerRatings!: Rating[];
+    /** 内部レートのリスト，Performance 計算用に Rated 参加者のみを含む． */
+    ratedInnerRatings!: Rating[];
     /** 現在のユーザの各問題の AC 時刻． */
     yourTaskAcceptedElapsedTimes!: ElapsedSeconds[];
     /** 現在のユーザのスコア */
@@ -54,7 +56,8 @@ export class Parent {
     /** 問題ごとの，コンテスト終了時点での推定正答者数 */
     acCountPredicted!: number[];
     /** 参加者の内部レートリストを基にして difficulty を推定する */
-    dc!: DifficultyCalculator;
+    dcForDifficulty!: DifficultyCalculator;
+    dcForPerformance!: DifficultyCalculator;
     yourStandingsEntry?: StandingsEntry;
 
     /** このコンテストがチーム戦かどうか */
@@ -137,7 +140,7 @@ export class Parent {
             acssaContentDiv,
             this.tasks,
             this.isEstimationEnabled,
-            this.dc,
+            this.dcForDifficulty,
             this.taskAcceptedCounts,
             this.yourTaskAcceptedElapsedTimes,
             this.acCountPredicted
@@ -152,6 +155,7 @@ export class Parent {
             this.acCountPredicted,
             standingsData,
             this.innerRatingsFromPredictor,
+            this.dcForPerformance,
             this.centerOfInnerRating,
             useRating
         );
@@ -172,7 +176,8 @@ export class Parent {
             this.yourScore,
             this.yourLastAcceptedTime,
             this.participants,
-            this.dc,
+            this.dcForDifficulty,
+            this.dcForPerformance,
             tabs
         );
 
@@ -198,6 +203,7 @@ export class Parent {
         this.taskAcceptedCounts = rangeLen(this.tasks.length).fill(0);
         this.taskAcceptedElapsedTimes = rangeLen(this.tasks.length).map(() => [] as number[]);
         this.innerRatings = [] as Rating[];
+        this.ratedInnerRatings = [] as Rating[];
         this.yourTaskAcceptedElapsedTimes = rangeLen(this.tasks.length).fill(-1);
         this.yourScore = -1;
         this.yourLastAcceptedTime = -1;
@@ -205,11 +211,31 @@ export class Parent {
         this.yourStandingsEntry = undefined;
 
         // scan
+        const threthold: moment.Moment = moment('2021-12-03T21:00:00+09:00');
+        const isAfterABC230 = startTime >= threthold;
         for (let i = 0; i < standingsData.length; ++i) {
             const standingsEntry = standingsData[i];
+            const isRated = standingsEntry.IsRated && (isAfterABC230 || standingsEntry.TotalResult.Count > 0);
+
+            // const innerRating: Rating = isTeamOrBeginner
+            //     ? correctedRating
+            //     : standingsEntry.UserScreenName in this.innerRatingsFromPredictor
+            //         ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
+            //         : RatingConverter.toInnerRating(
+            //             Math.max(RatingConverter.toRealRating(correctedRating), 1),
+            //             standingsEntry.Competitions
+            //         );
+            const innerRating: Rating =
+                standingsEntry.UserScreenName in this.innerRatingsFromPredictor
+                    ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                    : this.centerOfInnerRating;
+            if (isRated) {
+                this.ratedInnerRatings.push(innerRating);
+            }
 
             if (!standingsEntry.TaskResults) continue; // 参加登録していない
             if (standingsEntry.UserIsDeleted) continue; // アカウント削除
+
             // let correctedRating = this.isDuringContest ? standingsEntry.Rating : standingsEntry.OldRating;
             let correctedRating = standingsEntry.Rating;
             const isTeamOrBeginner = correctedRating === 0;
@@ -229,6 +255,7 @@ export class Parent {
                 score += taskResultEntry.Score;
                 penalty += taskResultEntry.Score === 0 ? taskResultEntry.Failure : taskResultEntry.Penalty;
             }
+
             if (score === 0 && penalty === 0 && standingsEntry.TotalResult.Count == 0) continue; // NoSub を飛ばす
             this.participants++;
             // console.log(i + 1, score, penalty);
@@ -241,15 +268,6 @@ export class Parent {
             } else {
                 this.scoreLastAcceptedTimeMap.set(score, [standingsEntry.TotalResult.Elapsed / NS2SEC]);
             }
-
-            const innerRating: Rating = isTeamOrBeginner
-                ? correctedRating
-                : standingsEntry.UserScreenName in this.innerRatingsFromPredictor
-                ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
-                : RatingConverter.toInnerRating(
-                      Math.max(RatingConverter.toRealRating(correctedRating), 1),
-                      standingsEntry.Competitions
-                  );
             // console.log(this.isDuringContest, standingsEntry.Rating, standingsEntry.OldRating, innerRating);
             // if (standingsEntry.IsRated && innerRating) {
 
@@ -286,7 +304,8 @@ export class Parent {
             }
         } // end for
         this.innerRatings.sort((a: Rating, b: Rating) => a - b);
-        this.dc = new DifficultyCalculator(this.innerRatings);
+        this.dcForDifficulty = new DifficultyCalculator(this.innerRatings);
+        this.dcForPerformance = new DifficultyCalculator(this.ratedInnerRatings);
     } // end async scanStandingsData
 
     predictAcCountSeries(): void {

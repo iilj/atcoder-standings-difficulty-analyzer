@@ -51,7 +51,8 @@ export class Charts {
     yourLastAcceptedTime: ElapsedSeconds;
     participants: number;
 
-    dc: DifficultyCalculator;
+    dcForDifficulty: DifficultyCalculator;
+    dcForPerformance: DifficultyCalculator;
     tabs: Tabs;
 
     duration: number;
@@ -67,7 +68,8 @@ export class Charts {
         yourScore: Score,
         yourLastAcceptedTime: ElapsedSeconds,
         participants: number,
-        dc: DifficultyCalculator,
+        dcForDifficulty: DifficultyCalculator,
+        dcForPerformance: DifficultyCalculator,
         tabs: Tabs
     ) {
         this.tasks = tasks;
@@ -80,7 +82,8 @@ export class Charts {
         this.yourLastAcceptedTime = yourLastAcceptedTime;
         this.participants = participants;
 
-        this.dc = dc;
+        this.dcForDifficulty = dcForDifficulty;
+        this.dcForPerformance = dcForPerformance;
         this.tabs = tabs;
 
         parent.insertAdjacentHTML('beforeend', html);
@@ -142,7 +145,9 @@ export class Charts {
             const correctedDifficulties: number[] = [];
             let counter = 0;
             for (const taskAcceptedCountForChart of taskAcceptedCountsForChart) {
-                correctedDifficulties.push(this.dc.binarySearchCorrectedDifficulty(taskAcceptedCountForChart));
+                correctedDifficulties.push(
+                    this.dcForDifficulty.binarySearchCorrectedDifficulty(taskAcceptedCountForChart)
+                );
                 counter += 1;
                 // 20回に1回setTimeout(0)でeventループに処理を移す
                 if (counter % 20 == 0) {
@@ -176,7 +181,9 @@ export class Charts {
                     const yourAcceptedCount =
                         arrayLowerBound(this.taskAcceptedElapsedTimes[j], this.yourTaskAcceptedElapsedTimes[j]) + 1;
                     yourAcceptedCounts.push(yourAcceptedCount);
-                    yourAcceptedDifficulties.push(this.dc.binarySearchCorrectedDifficulty(yourAcceptedCount));
+                    yourAcceptedDifficulties.push(
+                        this.dcForDifficulty.binarySearchCorrectedDifficulty(yourAcceptedCount)
+                    );
                 }
             }
 
@@ -277,9 +284,9 @@ export class Charts {
     /** Difficulty Chart 描画 */
     async plotDifficultyChartData(difficultyChartData: Partial<Plotly.ScatterData>[]): Promise<void> {
         const maxAcceptedCount = this.taskAcceptedCounts.reduce((a, b) => Math.max(a, b));
-        const yMax = RatingConverter.toCorrectedRating(this.dc.binarySearchCorrectedDifficulty(1));
+        const yMax = RatingConverter.toCorrectedRating(this.dcForDifficulty.binarySearchCorrectedDifficulty(1));
         const yMin = RatingConverter.toCorrectedRating(
-            this.dc.binarySearchCorrectedDifficulty(Math.max(2, maxAcceptedCount))
+            this.dcForDifficulty.binarySearchCorrectedDifficulty(Math.max(2, maxAcceptedCount))
         );
 
         // 描画
@@ -333,9 +340,10 @@ export class Charts {
     async plotAcceptedCountChartData(acceptedCountChartData: Partial<Plotly.ScatterData>[]): Promise<void> {
         this.tabs.acceptedCountYMax = this.participants;
         const rectSpans: [number, number, string][] = colors.reduce((ar, cur) => {
-            const bottom = this.dc.perf2ExpectedAcceptedCount(cur[1]);
+            const bottom = this.dcForDifficulty.perf2ExpectedAcceptedCount(cur[1]);
             if (bottom > this.tabs.acceptedCountYMax) return ar;
-            const top = cur[0] == 0 ? this.tabs.acceptedCountYMax : this.dc.perf2ExpectedAcceptedCount(cur[0]);
+            const top =
+                cur[0] == 0 ? this.tabs.acceptedCountYMax : this.dcForDifficulty.perf2ExpectedAcceptedCount(cur[0]);
             if (top < 0.5) return ar;
             ar.push([Math.max(0.5, bottom), Math.min(this.tabs.acceptedCountYMax, top), cur[2]]);
             return ar;
@@ -397,9 +405,9 @@ export class Charts {
         const xMax = this.participants;
         const yMax = Math.ceil((maxAcceptedTime + this.xtick / 2) / this.xtick) * this.xtick;
         const rectSpans: [number, number, string][] = colors.reduce((ar, cur) => {
-            const right = cur[0] == 0 ? xMax : this.dc.perf2Ranking(cur[0]);
+            const right = cur[0] == 0 ? xMax : this.dcForPerformance.perf2Ranking(cur[0]);
             if (right < 1) return ar;
-            const left = this.dc.perf2Ranking(cur[1]);
+            const left = this.dcForPerformance.perf2Ranking(cur[1]);
             if (left > xMax) return ar;
             ar.push([Math.max(0, left), Math.min(xMax, right), cur[2]]);
             return ar;

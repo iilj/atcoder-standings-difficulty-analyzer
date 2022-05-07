@@ -81,6 +81,7 @@ export class PerformanceTable {
         acCountPredicted: number[],
         standingsData: StandingsEntry[],
         innerRatingsFromPredictor: InnerRatingsFromPredictor,
+        dcForPerformance: DifficultyCalculator,
         centerOfInnerRating: number,
         useRating: boolean
     ) {
@@ -93,13 +94,13 @@ export class PerformanceTable {
         for (let i = 0; i < len; ++i) {
             rems.push(Math.ceil(acCountPredicted[i] - taskAcceptedCounts[i])); //
         }
-        console.log(rems);
+        // console.log(rems);
 
         type ScoreRow = [Rating, number, number, number[], boolean];
         const scores: ScoreRow[] = []; // (現レート，スコア合計，時間，問題ごとのスコア，rated)
         const highestScores = tasks.map(() => 0);
         let rowPtr: ScoreRow | undefined = undefined;
-        const ratedInnerRatings: Rating[] = [];
+        // const ratedInnerRatings: Rating[] = [];
         const ratedUserRanks: number[] = [];
         // console.log(standingsData);
         const threthold: moment.Moment = moment('2021-12-03T21:00:00+09:00');
@@ -147,7 +148,7 @@ export class PerformanceTable {
                     : this.centerOfInnerRating;
 
             if (isRated) {
-                ratedInnerRatings.push(innerRating);
+                // ratedInnerRatings.push(innerRating);
                 ratedUserRanks.push(standingsEntry.EntireRank);
                 // if (innerRating || true) {
                 const row: ScoreRow = [
@@ -249,7 +250,7 @@ export class PerformanceTable {
             }
         } //1246
         estimatedRank += sameCnt / 2;
-        const dc = new DifficultyCalculator(ratedInnerRatings);
+        // const dc = new DifficultyCalculator(ratedInnerRatings);
 
         // insert
         parent.insertAdjacentHTML(
@@ -294,7 +295,7 @@ export class PerformanceTable {
         const id = `td-assa-perf-current`;
         // TODO: ちゃんと判定する
         // const perf = Math.min(2400, dc.rank2InnerPerf(ratedRank));
-        const perf = RatingConverter.toCorrectedRating(dc.rank2InnerPerf(ratedRank));
+        const perf = RatingConverter.toCorrectedRating(dcForPerformance.rank2InnerPerf(ratedRank));
         //
         (document.getElementById(`acssa-perf-tbody`) as HTMLElement).insertAdjacentHTML(
             'beforeend',
@@ -329,7 +330,7 @@ export class PerformanceTable {
         }
         if (isEstimationEnabled) {
             if (estimatedRank != -1) {
-                const perfEstimated = RatingConverter.toCorrectedRating(dc.rank2InnerPerf(estimatedRank));
+                const perfEstimated = RatingConverter.toCorrectedRating(dcForPerformance.rank2InnerPerf(estimatedRank));
                 const id2 = `td-assa-perf-predicted`;
                 (document.getElementById(`acssa-perf-tbody-predicted`) as HTMLElement).insertAdjacentHTML(
                     'beforeend',

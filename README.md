@@ -66,3 +66,6 @@ Tampermonkey 等で読み込んで使用してください．
   - テーブルに表示される difficulty 400 未満の推定値が誤っていた問題を修正（グラフは以前から正しい）
 - 2022.5.0
   - 処理の重い部分に定期的に event loop に処理を譲る処理を追加 (https://github.com/flours さん)
+- 2022.5.1
+  - Performance テーブルを追加 (#6)
+  - LastAcceptedTime チャートの背景色の Difficulty 境界がズレていた問題を修正 (#4)
