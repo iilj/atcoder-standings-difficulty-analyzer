@@ -1,6 +1,6 @@
 {
   "name": "atcoder-standings-difficulty-analyzer",
-  "version": "2022.5.1",
+  "version": "2022.5.2",
   "description": "順位表の得点情報を集計し，推定 difficulty やその推移を表示します．",
   "typeRoots": [
     "types",

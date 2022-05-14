@@ -46,6 +46,8 @@ export class Parent {
     innerRatings!: Rating[];
     /** 内部レートのリスト，Performance 計算用に Rated 参加者のみを含む． */
     ratedInnerRatings!: Rating[];
+    /** Rated なユーザの全体順位（Unrated ユーザ含む）を格納する配列． */
+    ratedRank2EntireRank!: number[];
     /** 現在のユーザの各問題の AC 時刻． */
     yourTaskAcceptedElapsedTimes!: ElapsedSeconds[];
     /** 現在のユーザのスコア */
@@ -179,6 +181,7 @@ export class Parent {
             this.participants,
             this.dcForDifficulty,
             this.dcForPerformance,
+            this.ratedRank2EntireRank,
             tabs
         );
 
@@ -210,6 +213,7 @@ export class Parent {
         this.taskAcceptedElapsedTimes = rangeLen(this.tasks.length).map(() => [] as number[]);
         this.innerRatings = [] as Rating[];
         this.ratedInnerRatings = [] as Rating[];
+        this.ratedRank2EntireRank = [];
         this.yourTaskAcceptedElapsedTimes = rangeLen(this.tasks.length).fill(-1);
         this.yourScore = -1;
         this.yourLastAcceptedTime = -1;
@@ -229,6 +233,7 @@ export class Parent {
                         ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
                         : this.centerOfInnerRating;
                 this.ratedInnerRatings.push(ratedInnerRating);
+                this.ratedRank2EntireRank.push(standingsEntry.EntireRank);
             }
 
             if (!standingsEntry.TaskResults) continue; // 参加登録していない
@@ -312,6 +317,7 @@ export class Parent {
         } // end for
         this.innerRatings.sort((a: Rating, b: Rating) => a - b);
         this.ratedInnerRatings.sort((a: Rating, b: Rating) => a - b);
+        this.ratedRank2EntireRank.sort((a: Rating, b: Rating) => a - b);
         this.dcForDifficulty = new DifficultyCalculator(this.innerRatings);
         this.dcForPerformance = new DifficultyCalculator(this.ratedInnerRatings);
     } // end async scanStandingsData
