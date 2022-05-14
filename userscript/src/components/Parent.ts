@@ -16,6 +16,7 @@ import { DifficyltyTable } from './DifficultyTable';
 import { Tabs } from './Tabs';
 import { PerformanceTable } from './PerformanceTable';
 import { DEBUG, DEBUG_USERNAME } from './debug';
+import { RatingConverter } from '../utils/RatingConverter';
 
 const NS2SEC = 1000000000 as const;
 
@@ -45,6 +46,8 @@ export class Parent {
     innerRatings!: Rating[];
     /** 内部レートのリスト，Performance 計算用に Rated 参加者のみを含む． */
     ratedInnerRatings!: Rating[];
+    /** Rated なユーザの全体順位（Unrated ユーザ含む）を格納する配列． */
+    ratedRank2EntireRank!: number[];
     /** 現在のユーザの各問題の AC 時刻． */
     yourTaskAcceptedElapsedTimes!: ElapsedSeconds[];
     /** 現在のユーザのスコア */
@@ -178,6 +181,7 @@ export class Parent {
             this.participants,
             this.dcForDifficulty,
             this.dcForPerformance,
+            this.ratedRank2EntireRank,
             tabs
         );
 
@@ -209,6 +213,7 @@ export class Parent {
         this.taskAcceptedElapsedTimes = rangeLen(this.tasks.length).map(() => [] as number[]);
         this.innerRatings = [] as Rating[];
         this.ratedInnerRatings = [] as Rating[];
+        this.ratedRank2EntireRank = [];
         this.yourTaskAcceptedElapsedTimes = rangeLen(this.tasks.length).fill(-1);
         this.yourScore = -1;
         this.yourLastAcceptedTime = -1;
@@ -222,20 +227,13 @@ export class Parent {
             const standingsEntry = standingsData[i];
             const isRated = standingsEntry.IsRated && (isAfterABC230 || standingsEntry.TotalResult.Count > 0);
 
-            // const innerRating: Rating = isTeamOrBeginner
-            //     ? correctedRating
-            //     : standingsEntry.UserScreenName in this.innerRatingsFromPredictor
-            //         ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
-            //         : RatingConverter.toInnerRating(
-            //             Math.max(RatingConverter.toRealRating(correctedRating), 1),
-            //             standingsEntry.Competitions
-            //         );
-            const innerRating: Rating =
-                standingsEntry.UserScreenName in this.innerRatingsFromPredictor
-                    ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
-                    : this.centerOfInnerRating;
             if (isRated) {
-                this.ratedInnerRatings.push(innerRating);
+                const ratedInnerRating: Rating =
+                    standingsEntry.UserScreenName in this.innerRatingsFromPredictor
+                        ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                        : this.centerOfInnerRating;
+                this.ratedInnerRatings.push(ratedInnerRating);
+                this.ratedRank2EntireRank.push(standingsEntry.EntireRank);
             }
 
             if (!standingsEntry.TaskResults) continue; // 参加登録していない
@@ -248,6 +246,15 @@ export class Parent {
                 // continue; // 初参加 or チーム
                 correctedRating = this.centerOfInnerRating;
             }
+
+            const innerRating: Rating = isTeamOrBeginner
+                ? correctedRating
+                : standingsEntry.UserScreenName in this.innerRatingsFromPredictor
+                ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                : RatingConverter.toInnerRating(
+                      Math.max(RatingConverter.toRealRating(correctedRating), 1),
+                      standingsEntry.Competitions
+                  );
 
             // これは飛ばしちゃダメ（提出しても 0 AC だと Penalty == 0 なので）
             // if (standingsEntry.TotalResult.Score == 0 && standingsEntry.TotalResult.Penalty == 0) continue;
@@ -309,6 +316,8 @@ export class Parent {
             }
         } // end for
         this.innerRatings.sort((a: Rating, b: Rating) => a - b);
+        this.ratedInnerRatings.sort((a: Rating, b: Rating) => a - b);
+        this.ratedRank2EntireRank.sort((a: Rating, b: Rating) => a - b);
         this.dcForDifficulty = new DifficultyCalculator(this.innerRatings);
         this.dcForPerformance = new DifficultyCalculator(this.ratedInnerRatings);
     } // end async scanStandingsData

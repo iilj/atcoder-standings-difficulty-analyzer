@@ -53,6 +53,7 @@ export class Charts {
 
     dcForDifficulty: DifficultyCalculator;
     dcForPerformance: DifficultyCalculator;
+    ratedRank2EntireRank: number[];
     tabs: Tabs;
 
     duration: number;
@@ -70,6 +71,7 @@ export class Charts {
         participants: number,
         dcForDifficulty: DifficultyCalculator,
         dcForPerformance: DifficultyCalculator,
+        ratedRank2EntireRank: number[],
         tabs: Tabs
     ) {
         this.tasks = tasks;
@@ -84,6 +86,7 @@ export class Charts {
 
         this.dcForDifficulty = dcForDifficulty;
         this.dcForPerformance = dcForPerformance;
+        this.ratedRank2EntireRank = ratedRank2EntireRank;
         this.tabs = tabs;
 
         parent.insertAdjacentHTML('beforeend', html);
@@ -403,11 +406,17 @@ export class Charts {
         maxAcceptedTime: ElapsedSeconds
     ): Promise<void> {
         const xMax = this.participants;
+        // Rated 内のランクから，全体のランクへ変換する
+        const convRatedRank2EntireRank = (ratedRank: number): number => {
+            const intRatedRank = Math.floor(ratedRank);
+            if (intRatedRank >= this.ratedRank2EntireRank.length) return xMax;
+            return this.ratedRank2EntireRank[intRatedRank];
+        };
         const yMax = Math.ceil((maxAcceptedTime + this.xtick / 2) / this.xtick) * this.xtick;
         const rectSpans: [number, number, string][] = colors.reduce((ar, cur) => {
-            const right = cur[0] == 0 ? xMax : this.dcForPerformance.perf2Ranking(cur[0]);
+            const right = cur[0] == 0 ? xMax : convRatedRank2EntireRank(this.dcForPerformance.perf2Ranking(cur[0]));
             if (right < 1) return ar;
-            const left = this.dcForPerformance.perf2Ranking(cur[1]);
+            const left = cur[1] === 10000 ? 0 : convRatedRank2EntireRank(this.dcForPerformance.perf2Ranking(cur[1]));
             if (left > xMax) return ar;
             ar.push([Math.max(0, left), Math.min(xMax, right), cur[2]]);
             return ar;
