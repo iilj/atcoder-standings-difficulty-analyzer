@@ -16,6 +16,7 @@ import { DifficyltyTable } from './DifficultyTable';
 import { Tabs } from './Tabs';
 import { PerformanceTable } from './PerformanceTable';
 import { DEBUG, DEBUG_USERNAME } from './debug';
+import { RatingConverter } from '../utils/RatingConverter';
 
 const NS2SEC = 1000000000 as const;
 
@@ -222,20 +223,12 @@ export class Parent {
             const standingsEntry = standingsData[i];
             const isRated = standingsEntry.IsRated && (isAfterABC230 || standingsEntry.TotalResult.Count > 0);
 
-            // const innerRating: Rating = isTeamOrBeginner
-            //     ? correctedRating
-            //     : standingsEntry.UserScreenName in this.innerRatingsFromPredictor
-            //         ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
-            //         : RatingConverter.toInnerRating(
-            //             Math.max(RatingConverter.toRealRating(correctedRating), 1),
-            //             standingsEntry.Competitions
-            //         );
-            const innerRating: Rating =
-                standingsEntry.UserScreenName in this.innerRatingsFromPredictor
-                    ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
-                    : this.centerOfInnerRating;
             if (isRated) {
-                this.ratedInnerRatings.push(innerRating);
+                const ratedInnerRating: Rating =
+                    standingsEntry.UserScreenName in this.innerRatingsFromPredictor
+                        ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                        : this.centerOfInnerRating;
+                this.ratedInnerRatings.push(ratedInnerRating);
             }
 
             if (!standingsEntry.TaskResults) continue; // 参加登録していない
@@ -248,6 +241,15 @@ export class Parent {
                 // continue; // 初参加 or チーム
                 correctedRating = this.centerOfInnerRating;
             }
+
+            const innerRating: Rating = isTeamOrBeginner
+                ? correctedRating
+                : standingsEntry.UserScreenName in this.innerRatingsFromPredictor
+                ? this.innerRatingsFromPredictor[standingsEntry.UserScreenName]
+                : RatingConverter.toInnerRating(
+                      Math.max(RatingConverter.toRealRating(correctedRating), 1),
+                      standingsEntry.Competitions
+                  );
 
             // これは飛ばしちゃダメ（提出しても 0 AC だと Penalty == 0 なので）
             // if (standingsEntry.TotalResult.Score == 0 && standingsEntry.TotalResult.Penalty == 0) continue;
@@ -309,6 +311,7 @@ export class Parent {
             }
         } // end for
         this.innerRatings.sort((a: Rating, b: Rating) => a - b);
+        this.ratedInnerRatings.sort((a: Rating, b: Rating) => a - b);
         this.dcForDifficulty = new DifficultyCalculator(this.innerRatings);
         this.dcForPerformance = new DifficultyCalculator(this.ratedInnerRatings);
     } // end async scanStandingsData
