@@ -161,13 +161,13 @@ export class Charts {
             difficultyChartData.push({
                 x: taskAcceptedElapsedTimesForChart,
                 y: correctedDifficulties,
-                type: 'scatter',
+                type: 'scattergl',
                 name: `${this.tasks[j].Assignment}`,
             });
             acceptedCountChartData.push({
                 x: taskAcceptedElapsedTimesForChart,
                 y: taskAcceptedCountsForChart,
-                type: 'scatter',
+                type: 'scattergl',
                 name: `${this.tasks[j].Assignment}`,
             });
         }
@@ -194,7 +194,7 @@ export class Charts {
                 x: yourAcceptedTimes,
                 y: yourAcceptedDifficulties,
                 mode: 'markers',
-                type: 'scatter',
+                type: 'scattergl',
                 name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                 marker: yourMarker,
             };
@@ -202,7 +202,7 @@ export class Charts {
                 x: yourAcceptedTimes,
                 y: yourAcceptedCounts,
                 mode: 'markers',
-                type: 'scatter',
+                type: 'scattergl',
                 name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                 marker: yourMarker,
             };
@@ -236,7 +236,7 @@ export class Charts {
             lastAcceptedTimeChartData.push({
                 x: lastAcceptedTimesRanks,
                 y: lastAcceptedTimesForChart,
-                type: 'scatter',
+                type: 'scattergl',
                 name: `${score}`,
             });
 
@@ -246,7 +246,7 @@ export class Charts {
                     x: [acc + lastAcceptedTimesRank + 1],
                     y: [this.yourLastAcceptedTime],
                     mode: 'markers',
-                    type: 'scatter',
+                    type: 'scattergl',
                     name: `${DEBUG ? DEBUG_USERNAME : userScreenName}`,
                     marker: yourMarker,
                 };

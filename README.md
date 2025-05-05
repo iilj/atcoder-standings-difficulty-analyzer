@@ -34,6 +34,13 @@ AtCoder の順位表ページに，コンテスト中の Difficulty 推移を表
 Tampermonkey 等で読み込んで使用してください．
 
 
+## 開発の手引
+
+内容が若干古いものの下記ページにまとめてある．
+
+[Userscript を TypeScript で書く \| iilj memo](https://iilj.github.io/txt/userscript/2021/07/31/userscript-typescript.html)
+
+
 ## 更新履歴
 
 - 2021.1.2.0
@@ -72,3 +79,8 @@ Tampermonkey 等で読み込んで使用してください．
   - Performance テーブルを追加 (#6)
   - チャートを表示しないオプション用チェックボックス（Onload plot）を追加 (#5)
   - LastAcceptedTime チャートの背景色の Difficulty 境界がズレていた問題を修正 (#4)
+- 2022.5.2
+  - Difficulty 推定値がズレていた問題を修正 (#10)
+  - LastAcceptedTime チャートの背景色の Difficulty 境界がズレていた問題を修正 (#9)
+- 2025.5.5
+  - ac-predictor との競合を解消 (#12)
